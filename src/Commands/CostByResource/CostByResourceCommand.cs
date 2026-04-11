@@ -27,7 +27,7 @@ public class CostByResourceCommand : AsyncCommand<CostByResourceSettings>
         _outputFormatters.Add(OutputFormat.Csv, new CsvOutputFormatter());
     }
 
-    public override ValidationResult Validate(CommandContext context, CostByResourceSettings settings)
+    protected override ValidationResult Validate(CommandContext context, CostByResourceSettings settings)
     {
         // Automatically set timeframe to Custom if both from and to dates are provided
         settings.ApplyAutoTimeframe();
@@ -44,7 +44,7 @@ public class CostByResourceCommand : AsyncCommand<CostByResourceSettings>
         return ValidationResult.Success();
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, CostByResourceSettings settings)
+    protected override async Task<int> ExecuteAsync(CommandContext context, CostByResourceSettings settings, CancellationToken cancellationToken)
     {
         // Show version
         if (settings.Debug)

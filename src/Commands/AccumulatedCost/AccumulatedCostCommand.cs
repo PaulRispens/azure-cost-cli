@@ -25,7 +25,7 @@ public class AccumulatedCostCommand : AsyncCommand<AccumulatedCostSettings>
         _outputFormatters.Add(OutputFormat.Csv, new CsvOutputFormatter());
     }
 
-    public override ValidationResult Validate(CommandContext context, AccumulatedCostSettings settings)
+    protected override ValidationResult Validate(CommandContext context, AccumulatedCostSettings settings)
     {
         // Check if we have any scope parameters when the scope requires subscription
         if (settings.GetScope.IsSubscriptionBased && !settings.Subscription.HasValue)
@@ -58,7 +58,7 @@ public class AccumulatedCostCommand : AsyncCommand<AccumulatedCostSettings>
         return ValidationResult.Success();
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, AccumulatedCostSettings settings)
+    protected override async Task<int> ExecuteAsync(CommandContext context, AccumulatedCostSettings settings, CancellationToken cancellationToken)
     {
         // Show version
         if (settings.Debug)

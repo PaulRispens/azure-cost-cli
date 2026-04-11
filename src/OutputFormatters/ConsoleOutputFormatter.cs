@@ -76,7 +76,7 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
         table.ShowHeaders = false;
 
         // Add some columns
-        table.AddColumn("").Expand().Centered();
+        table.AddColumn(new TableColumn("").Centered()).Expand();
         table.AddColumn(new TableColumn("").Centered());
 
 
@@ -350,7 +350,7 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
         t.Title($"Daily costs grouped by {settings.Dimension}");
         t.Collapse();
         t.AddColumn("").Collapse();
-        t.AddColumn("").RightAligned().Collapse();
+        t.AddColumn(new TableColumn("").RightAligned()).Collapse();
         t.AddColumn("").Expand();
 
         t.Columns[1].Width = 15;

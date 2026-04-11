@@ -34,7 +34,7 @@ public class AccumulatedCostCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
         // Assert
         result.Successful.ShouldBeTrue();
@@ -54,7 +54,7 @@ public class AccumulatedCostCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
         // Assert
         result.Successful.ShouldBeFalse();
@@ -73,7 +73,7 @@ public class AccumulatedCostCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
         // Assert
         result.Successful.ShouldBeTrue();
@@ -93,7 +93,7 @@ public class AccumulatedCostCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
         // Assert
         result.Successful.ShouldBeTrue();
@@ -114,7 +114,7 @@ public class AccumulatedCostCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
         // Assert
         result.Successful.ShouldBeTrue();
@@ -135,7 +135,7 @@ public class AccumulatedCostCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
         // Assert
         result.Successful.ShouldBeFalse();

@@ -26,7 +26,7 @@ public class CostByTagCommand : AsyncCommand<CostByTagSettings>
         _outputFormatters.Add(OutputFormat.Csv, new CsvOutputFormatter());
     }
 
-    public override ValidationResult Validate(CommandContext context, CostByTagSettings settings)
+    protected override ValidationResult Validate(CommandContext context, CostByTagSettings settings)
     {
         // Automatically set timeframe to Custom if both from and to dates are provided
         settings.ApplyAutoTimeframe();
@@ -43,7 +43,7 @@ public class CostByTagCommand : AsyncCommand<CostByTagSettings>
         return ValidationResult.Success();
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, CostByTagSettings settings)
+    protected override async Task<int> ExecuteAsync(CommandContext context, CostByTagSettings settings, CancellationToken cancellationToken)
     {
         // Show version
         if (settings.Debug)

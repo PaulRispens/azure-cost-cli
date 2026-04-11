@@ -27,7 +27,7 @@ public class DailyCostCommand : AsyncCommand<DailyCostSettings>
         _outputFormatters.Add(OutputFormat.Csv, new CsvOutputFormatter());
     }
 
-    public override ValidationResult Validate(CommandContext context, DailyCostSettings settings)
+    protected override ValidationResult Validate(CommandContext context, DailyCostSettings settings)
     {
         // Automatically set timeframe to Custom if both from and to dates are provided
         settings.ApplyAutoTimeframe();
@@ -44,7 +44,7 @@ public class DailyCostCommand : AsyncCommand<DailyCostSettings>
         return ValidationResult.Success();
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, DailyCostSettings settings)
+    protected override async Task<int> ExecuteAsync(CommandContext context, DailyCostSettings settings, CancellationToken cancellationToken)
     {
         // Show version
         if (settings.Debug)

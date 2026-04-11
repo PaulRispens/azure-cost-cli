@@ -35,7 +35,7 @@ public class CostByTagCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
         // Assert
         result.Successful.ShouldBeTrue();
@@ -54,7 +54,7 @@ public class CostByTagCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
         // Assert
         result.Successful.ShouldBeFalse();
@@ -72,7 +72,7 @@ public class CostByTagCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
         // Assert
         result.Successful.ShouldBeTrue();
@@ -117,7 +117,7 @@ public class DetectAnomalyCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
         // Assert
         result.Successful.ShouldBeTrue();
@@ -136,7 +136,7 @@ public class DetectAnomalyCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
         // Assert
         result.Successful.ShouldBeFalse();

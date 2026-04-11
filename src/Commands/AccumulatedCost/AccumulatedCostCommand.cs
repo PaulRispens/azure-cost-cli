@@ -25,7 +25,7 @@ public class AccumulatedCostCommand : AsyncCommand<AccumulatedCostSettings>
         _outputFormatters.Add(OutputFormat.Csv, new CsvOutputFormatter());
     }
 
-    public override ValidationResult Validate(CommandContext context, AccumulatedCostSettings settings)
+    protected override ValidationResult Validate(CommandContext context, AccumulatedCostSettings settings)
     {
         // Automatically set timeframe to Custom if both from and to dates are provided
         settings.ApplyAutoTimeframe();
@@ -42,7 +42,7 @@ public class AccumulatedCostCommand : AsyncCommand<AccumulatedCostSettings>
         return ValidationResult.Success();
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, AccumulatedCostSettings settings)
+    protected override async Task<int> ExecuteAsync(CommandContext context, AccumulatedCostSettings settings, CancellationToken cancellationToken)
     {
         // Show version
         if (settings.Debug)

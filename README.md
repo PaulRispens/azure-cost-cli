@@ -24,6 +24,11 @@ It can also detect anomalies and trends in the cost, which can be used to furthe
 
 ## Installation
 
+### Prerequisites
+
+- .NET 8.0 or .NET 10.0 runtime
+- Azure CLI authenticated (`az login`) or an Azure identity with Cost Management Reader role
+
 You can install this tool globally, using the dotnet tool command:
 
 ```bash
@@ -434,6 +439,14 @@ Prices per region for a914b3f4-fe8b-4e94-a0d3-2938540d59c6 between 01/09/2023 an
 ```
 
 You can also output to csv or json for further processing. It uses the `usageDetails` endpoint, which provided different type of data than the `query` endpoint.
+
+#### Dev/Test
+
+The what-if dev-test command compares your current resource costs against Azure Dev/Test pricing to show potential savings if you switch your subscription to a Dev/Test offer.
+
+```bash
+azure-cost what-if devtest
+```
 
 ## Filter
 

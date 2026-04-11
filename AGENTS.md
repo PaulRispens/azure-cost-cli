@@ -10,6 +10,7 @@ Azure Cost CLI is a .NET command-line tool that retrieves Azure cost information
 src/
 ├── Program.cs                  # Entry point, DI setup, Spectre.Console.Cli command registration
 ├── Commands/                   # CLI commands (one subfolder per command)
+│   ├── CommandHelpers.cs       # Shared validation: subscription resolution, timeframe, version
 │   ├── AccumulatedCost/        # Default command: accumulated cost overview
 │   ├── DailyCost/              # Daily costs grouped by dimension
 │   ├── CostByResource/         # Cost breakdown by resource
@@ -26,18 +27,21 @@ src/
 │   ├── AzureRegionsRetriever.cs    # Calls Azure Regions API
 │   └── PollyPolicyExtensions.cs    # Retry/resilience policies (Polly)
 ├── OutputFormatters/           # Output rendering (Console, JSON, Text, Markdown, CSV)
+│   └── OutputFormatterFactory.cs   # Factory for formatter dictionary (used by all commands)
 └── Infrastructure/             # DI registrar/resolver, extensions, type converters
 ```
 
 Each command inherits from `AsyncCommand<TSettings>` (Spectre.Console.Cli) and follows a consistent pattern:
 - A `*Settings.cs` class defines CLI options/arguments
 - A `*Command.cs` class implements the command logic
+- `Validate()` uses `CommandHelpers` for subscription resolution and timeframe validation
+- Formatters are initialized via `OutputFormatterFactory.Create()`
 - Commands call `ICostRetriever` / `IPriceRetriever` / `IRegionsRetriever` (injected via DI)
 - Results are rendered through the appropriate `OutputFormatter`
 
 ## Prerequisites
 
-- .NET 8.0 SDK or .NET 9.0 SDK
+- .NET 8.0 SDK or .NET 10.0 SDK
 - Azure CLI authenticated (`az login`) for cost data access
 - An Azure subscription with Cost Management API access
 
@@ -48,10 +52,10 @@ Each command inherits from `AsyncCommand<TSettings>` (Spectre.Console.Cli) and f
 dotnet build src/azure-cost-cli.sln
 
 # Build a specific target framework
-dotnet build src/azure-cost-cli.csproj --framework net9.0
+dotnet build src/azure-cost-cli.csproj --framework net10.0
 ```
 
-The project targets both `net8.0` and `net9.0`. Warnings are treated as errors for NuGet dependency resolution (`NU1605`).
+The project targets both `net8.0` and `net10.0`. Warnings are treated as errors for NuGet dependency resolution (`NU1605`).
 
 ## Test
 
@@ -60,31 +64,32 @@ The project targets both `net8.0` and `net9.0`. Warnings are treated as errors f
 dotnet test src/azure-cost-cli.sln
 
 # Run tests for a specific framework
-dotnet test tests/AzureCostCli.Tests/AzureCostCli.Tests.csproj --framework net9.0
+dotnet test tests/AzureCostCli.Tests/AzureCostCli.Tests.csproj --framework net10.0
 ```
 
 Tests use **xUnit**, **Moq** for mocking, and **Shouldly** for assertions. Tests cover:
-- Command validation logic (date ranges, settings)
+- Command validation logic (date ranges, settings, subscription resolution)
+- Shared infrastructure (CommandHelpers, OutputFormatterFactory)
 - Cost data model parsing (API response deserialization)
-- Output formatters (JSON rendering, formatting)
+- Output formatters (JSON, Text, Markdown, CSV rendering)
 - Polly resilience policy behavior
 
 ## Run
 
 ```bash
 # Run from source (specify framework since the project multi-targets)
-dotnet run --project src/azure-cost-cli.csproj --framework net9.0 -- [command] [options]
+dotnet run --project src/azure-cost-cli.csproj --framework net10.0 -- [command] [options]
 
 # Show all available commands and options
-dotnet run --project src/azure-cost-cli.csproj --framework net9.0 -- --help
+dotnet run --project src/azure-cost-cli.csproj --framework net10.0 -- --help
 
 # Examples
-dotnet run --project src/azure-cost-cli.csproj --framework net9.0 -- accumulatedCost -o json
-dotnet run --project src/azure-cost-cli.csproj --framework net9.0 -- accumulatedCost -o text
-dotnet run --project src/azure-cost-cli.csproj --framework net9.0 -- dailyCosts --dimension MeterCategory
-dotnet run --project src/azure-cost-cli.csproj --framework net9.0 -- costByResource -o csv
-dotnet run --project src/azure-cost-cli.csproj --framework net9.0 -- budgets -o json
-dotnet run --project src/azure-cost-cli.csproj --framework net9.0 -- detectAnomalies -o text
+dotnet run --project src/azure-cost-cli.csproj --framework net10.0 -- accumulatedCost -o json
+dotnet run --project src/azure-cost-cli.csproj --framework net10.0 -- accumulatedCost -o text
+dotnet run --project src/azure-cost-cli.csproj --framework net10.0 -- dailyCosts --dimension MeterCategory
+dotnet run --project src/azure-cost-cli.csproj --framework net10.0 -- costByResource -o csv
+dotnet run --project src/azure-cost-cli.csproj --framework net10.0 -- budgets -o json
+dotnet run --project src/azure-cost-cli.csproj --framework net10.0 -- detectAnomalies -o text
 ```
 
 ### Install as global tool (from source)
@@ -109,11 +114,14 @@ azure-cost accumulatedCost -o json
 | `diff` | Compare costs between two timeframes |
 | `budgets` | Show configured budgets |
 | `regions` | List available Azure regions |
-| `what-if` | Run what-if cost scenarios |
+| `what-if region` | Run what-if cost scenarios across regions |
+| `what-if devtest` | Run what-if cost scenarios for dev/test pricing |
 
 ## Output Formats
 
 Specify with `-o` / `--output`: `Console` (default), `Json`, `JsonC`, `Text`, `Markdown`, `Csv`
+
+All formatters support all commands. Text and Markdown formatters include region listing, cost-by-tag breakdown, and prices-per-region output.
 
 ## Key Dependencies
 
@@ -136,6 +144,8 @@ GitHub Actions workflows in `.github/workflows/`:
 
 - All commands use `protected override` for `ExecuteAsync` and `Validate` methods (Spectre.Console.Cli 0.55.0+)
 - `ExecuteAsync` signature includes `CancellationToken cancellationToken` parameter
+- Subscription resolution and timeframe validation are centralized in `CommandHelpers`
+- Formatter dictionaries are created via `OutputFormatterFactory.Create()`
 - API calls go through the `CostApi/` layer interfaces, never directly from commands
 - Output rendering is delegated to `OutputFormatters/` classes
 - HTTP resilience uses Polly retry-after policies for Azure API rate limiting

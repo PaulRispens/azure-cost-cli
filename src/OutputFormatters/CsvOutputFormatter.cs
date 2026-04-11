@@ -152,6 +152,11 @@ public class CsvOutputFormatter : BaseOutputFormatter
         return Task.CompletedTask;
     }
 
+    public override Task WriteDevTestComparison(WhatIfSettings settings, IEnumerable<DevTestComparisonItem> items)
+    {
+        return ExportToCsv(settings.SkipHeader, items);
+    }
+
 
     private static Task ExportToCsv(bool skipHeader, IEnumerable<object> resources)
     {

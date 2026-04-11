@@ -736,6 +736,75 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
         return Task.CompletedTask;
     }
 
+    public override Task WriteDevTestComparison(WhatIfSettings settings, IEnumerable<DevTestComparisonItem> items)
+    {
+        var itemList = items.ToList();
+        if (itemList.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[yellow]No Virtual Machine resources found for DevTest comparison.[/]");
+            return Task.CompletedTask;
+        }
+
+        var tree = new Tree("[green bold]DevTest pricing comparison[/] for [bold]" + settings.Subscription +
+                            "[/] between [bold]" + settings.GetFromDate() + "[/] and [bold]" + settings.GetToDate() + "[/]");
+
+        var table = new Table();
+        table.Border(TableBorder.Rounded);
+        table.AddColumn("Resource");
+        table.AddColumn("Resource Group");
+        table.AddColumn("Meter");
+        table.AddColumn("Region");
+        table.AddColumn("Quantity");
+        table.AddColumn("Current Cost");
+        table.AddColumn("DevTest Cost");
+        table.AddColumn("Savings");
+        table.AddColumn("Savings %");
+
+        foreach (var item in itemList.OrderByDescending(i => i.Savings ?? 0))
+        {
+            var savingsMarkup = item.Savings.HasValue && item.Savings > 0
+                ? $"[green]{item.Savings:N2} {item.Currency}[/]"
+                : item.Savings.HasValue
+                    ? $"[red]{item.Savings:N2} {item.Currency}[/]"
+                    : "[dim]N/A[/]";
+
+            var savingsPctMarkup = item.SavingsPercentage.HasValue && item.SavingsPercentage > 0
+                ? $"[green]{item.SavingsPercentage:N1}%[/]"
+                : item.SavingsPercentage.HasValue
+                    ? $"[red]{item.SavingsPercentage:N1}%[/]"
+                    : "[dim]N/A[/]";
+
+            table.AddRow(
+                new Markup(Markup.Escape(item.ResourceName)),
+                new Markup(Markup.Escape(item.ResourceGroup)),
+                new Markup(Markup.Escape(item.MeterName)),
+                new Markup(Markup.Escape(item.Region)),
+                new Markup($"{item.Quantity:N2}"),
+                new Money(item.CurrentCost, item.Currency),
+                item.DevTestCost.HasValue
+                    ? new Money(item.DevTestCost.Value, item.Currency)
+                    : new Markup("[dim]N/A[/]"),
+                new Markup(savingsMarkup),
+                new Markup(savingsPctMarkup));
+        }
+
+        var totalCurrent = itemList.Sum(i => i.CurrentCost);
+        var totalDevTest = itemList.Where(i => i.DevTestCost.HasValue).Sum(i => i.DevTestCost!.Value);
+        var totalSavings = totalCurrent - totalDevTest;
+        var currency = itemList.First().Currency;
+
+        tree.AddNode(table);
+        tree.AddNode($"[bold]Total current cost:[/] {totalCurrent:N2} {currency}");
+        tree.AddNode($"[bold]Total DevTest cost:[/] {totalDevTest:N2} {currency}");
+        tree.AddNode(totalSavings > 0
+            ? $"[bold green]Total savings: {totalSavings:N2} {currency} ({totalSavings / totalCurrent * 100:N1}%)[/]"
+            : $"[bold red]Total savings: {totalSavings:N2} {currency}[/]");
+
+        AnsiConsole.Write(tree);
+
+        return Task.CompletedTask;
+    }
+
     public override Task WriteAccumulatedDiffCost(DiffSettings settings, AccumulatedCostDetails accumulatedCostSource,
             AccumulatedCostDetails accumulatedCostTarget)
         {

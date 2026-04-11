@@ -1,20 +1,17 @@
-using System.Collections.Concurrent;
 using AzureCostCli.CostApi;
+using AzureCostCli.Infrastructure;
 using AzureCostCli.OutputFormatters;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
 namespace AzureCostCli.Commands.WhatIf;
 
+// Run what-if scenarios to check price difference if the resources were on a DevTest subscription
 public class DevTestWhatIfCommand : AsyncCommand<WhatIfSettings>
 {
     private readonly IPriceRetriever _priceRetriever;
     private readonly ICostRetriever _costRetriever;
     private readonly Dictionary<OutputFormat, BaseOutputFormatter> _outputFormatters = OutputFormatterFactory.Create();
-
-    private ConcurrentDictionary<string, CacheEntry> _cache = new();
-    private ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
-    private TimeSpan _cacheLifetime = TimeSpan.FromHours(1);
 
     public DevTestWhatIfCommand(IPriceRetriever priceRetriever, ICostRetriever costRetriever)
     {
@@ -34,103 +31,138 @@ public class DevTestWhatIfCommand : AsyncCommand<WhatIfSettings>
         _costRetriever.CostApiAddress = settings.CostApiAddress;
         _priceRetriever.PriceApiAddress = settings.PriceApiAddress;
 
-        IEnumerable<CostResourceItem> resources = Enumerable.Empty<CostResourceItem>();
-
-
+        IEnumerable<UsageDetails> resources = Enumerable.Empty<UsageDetails>();
+        List<DevTestComparisonItem> comparisonItems = new();
 
         await AnsiConsoleExt.Status()
-            .StartAsync("Fetching cost data for resources...", async ctx =>
+            .StartAsync("Fetching usage details...", async ctx =>
             {
-                resources = await _costRetriever.RetrieveCostForResources(
+                resources = await _costRetriever.RetrieveUsageDetails(
                     settings.Debug,
-                    settings.GetScope, settings.Filter,
-                    settings.Metric,
-                    false,
-                    settings.Timeframe,
+                    settings.GetScope,
+                    "",
                     settings.GetFromDate(),
                     settings.GetToDate());
 
-                ctx.Status = "Running What-If analysis...";
+                // Group by resource ID + meterId, summing quantity and cost
+                resources = resources
+                    .Where(a => a.properties is { consumedService: "Microsoft.Compute", meterDetails.meterCategory: "Virtual Machines" })
+                    .GroupBy(a => new { a.properties.resourceId, a.properties.meterId })
+                    .Select(a =>
+                    {
+                        var first = a.First();
+                        return new UsageDetails
+                        {
+                            id = first.id,
+                            name = first.name,
+                            type = first.type,
+                            kind = first.kind,
+                            tags = first.tags,
+                            properties = new UsageProperties
+                            {
+                                meterDetails = new MeterDetails
+                                {
+                                    meterCategory = first.properties.meterDetails.meterCategory,
+                                    unitOfMeasure = first.properties.meterDetails.unitOfMeasure,
+                                    meterName = first.properties.meterDetails.meterName,
+                                    meterSubCategory = first.properties.meterDetails.meterSubCategory,
+                                },
+                                quantity = a.Sum(b => b.properties.quantity),
+                                consumedService = first.properties.consumedService,
+                                cost = a.Sum(b => b.properties.cost),
+                                meterId = first.properties.meterId,
+                                resourceGroup = first.properties.resourceGroup,
+                                frequency = first.properties.frequency,
+                                product = first.properties.product,
+                                additionalInfo = first.properties.additionalInfo,
+                                billingCurrency = first.properties.billingCurrency,
+                                billingProfileId = first.properties.billingProfileId,
+                                offerId = first.properties.offerId,
+                                chargeType = first.properties.chargeType,
+                                resourceLocation = first.properties.resourceLocation,
+                                resourceId = first.properties.resourceId,
+                                resourceName = first.properties.resourceName,
+                                billingProfileName = first.properties.billingProfileName,
+                                unitPrice = first.properties.unitPrice,
+                                effectivePrice = first.properties.effectivePrice,
+                                billingPeriodStartDate = first.properties.billingPeriodStartDate,
+                                billingPeriodEndDate = first.properties.billingPeriodEndDate,
+                                publisherType = first.properties.publisherType,
+                                isAzureCreditEligible = first.properties.isAzureCreditEligible,
+                                subscriptionName = first.properties.subscriptionName,
+                                subscriptionId = first.properties.subscriptionId,
+                            }
+                        };
+                    });
 
-                List<Task> tasks = new List<Task>();
-                
+                ctx.Status = "Fetching DevTest prices...";
+
                 foreach (var resource in resources)
                 {
-                    tasks.Add(Task.Run(async () =>
-                    {
-                        var serviceName = resource.ServiceName;
-                        var location = resource.ResourceLocation;
-                        var currency = resource.Currency;
+                    string skuName = resource.properties.meterDetails.meterName;
+                    ctx.Status = $"Fetching DevTest prices for {skuName}";
 
-                        // Skip if any required parameter is missing
-                        if (string.IsNullOrWhiteSpace(serviceName) || string.IsNullOrWhiteSpace(location)) return;
+                    var devTestPrices = await FetchDevTestPrices(skuName, resource.properties.meterId,
+                        resource.properties.billingCurrency);
 
-                        var devTestPrice = await GetDevTestPrice(serviceName, location, currency);
+                    // Find the DevTest price for the resource's current region
+                    var devTestPrice = devTestPrices
+                        .FirstOrDefault(p => string.Equals(p.ArmRegionName, resource.properties.resourceLocation, StringComparison.OrdinalIgnoreCase));
 
-                        if (devTestPrice.HasValue) // && devTestPrice < resource.Cost)
-                        {
-                            Console.WriteLine($"Resource ID {resource.ResourceId} could have saved {resource.Cost - devTestPrice} {currency} with DevTest pricing.");
-                        }
-                    }));
+                    double currentCost = resource.properties.cost;
+                    double? devTestUnitPrice = devTestPrice?.RetailPrice;
+                    double? devTestCost = devTestUnitPrice.HasValue ? resource.properties.quantity * devTestUnitPrice.Value : null;
+                    double? savings = devTestCost.HasValue ? currentCost - devTestCost.Value : null;
+                    double? savingsPct = savings.HasValue && currentCost > 0 ? savings.Value / currentCost * 100 : null;
+
+                    comparisonItems.Add(new DevTestComparisonItem(
+                        ResourceName: resource.properties.resourceName ?? resource.name,
+                        ResourceGroup: resource.properties.resourceGroup ?? "",
+                        Product: resource.properties.product ?? "",
+                        MeterName: skuName ?? "",
+                        Region: resource.properties.resourceLocation ?? "",
+                        Currency: resource.properties.billingCurrency ?? "USD",
+                        UnitOfMeasure: resource.properties.meterDetails?.unitOfMeasure ?? "",
+                        Quantity: resource.properties.quantity,
+                        CurrentUnitPrice: resource.properties.effectivePrice,
+                        CurrentCost: currentCost,
+                        DevTestUnitPrice: devTestUnitPrice,
+                        DevTestCost: devTestCost,
+                        Savings: savings,
+                        SavingsPercentage: savingsPct));
                 }
-
-                // Wait for all tasks to complete
-                await Task.WhenAll(tasks);
-                
             });
 
+        await _outputFormatters[settings.Output]
+            .WriteDevTestComparison(settings, comparisonItems);
 
         return 0;
     }
 
-    private async Task<double?> GetDevTestPrice(string serviceName, string location, string currency)
+    private readonly Dictionary<string, IEnumerable<PriceRecord>> _priceCache = new();
+
+    private async Task<IEnumerable<PriceRecord>> FetchDevTestPrices(string skuName, string meterId,
+        string currency = "USD")
     {
-        // Use the service name, location, and currency as the cache key
-        string cacheKey = $"{serviceName}:{location}:{currency}";
+        var cacheKey = $"{skuName}:{meterId}:{currency}";
 
-        // Check if the cache entry exists and if it's not expired
-        if (_cache.TryGetValue(cacheKey, out CacheEntry cacheEntry) && cacheEntry.Expiry > DateTime.Now)
+        if (_priceCache.TryGetValue(cacheKey, out var cached))
         {
-            return cacheEntry.Price;
+            return cached;
         }
 
-        // Get or create a new lock for this cache key
-        SemaphoreSlim mylock = _locks.GetOrAdd(cacheKey, k => new SemaphoreSlim(1, 1));
+        // Fetch DevTest (priceType=DevTestConsumption) prices for the same SKU
+        string filter = $"serviceName eq 'Virtual Machines' and skuName eq '{skuName}' and type eq 'DevTestConsumption'";
+        IEnumerable<PriceRecord> prices = await _priceRetriever.GetAzurePricesAsync(currency, filter);
 
-        // Use the semaphore to ensure only one thread at a time can update a given cache entry
-        await mylock.WaitAsync();
+        // Match by meterId to find the correct product (avoids mixing Windows/Linux)
+        var actualItem = prices.FirstOrDefault(a => a.MeterId == meterId);
 
-        try
-        {
-            // Check the cache again, in case another thread updated the entry while this thread was waiting for the lock
-            if (_cache.TryGetValue(cacheKey, out cacheEntry) && cacheEntry.Expiry > DateTime.Now)
-            {
-                return cacheEntry.Price;
-            }
+        if (actualItem is not null)
+            prices = prices.Where(a => a.ProductName == actualItem.ProductName);
 
-            // If the price is not in the cache or it's expired, get it from the API
-            string filter =
-                $"priceType eq 'DevTestConsumption' and Location eq '{location}' and serviceName eq '{serviceName}'";
-            IEnumerable<PriceRecord> devTestPrices = await _priceRetriever.GetAzurePricesAsync(filter);
-            var devTestPriceRecord = devTestPrices.FirstOrDefault();
-            double? price = devTestPriceRecord?.RetailPrice;
+        _priceCache[cacheKey] = prices;
 
-            // Store the price in the cache with an expiry time
-            _cache[cacheKey] = new CacheEntry { Price = price, Expiry = DateTime.Now.Add(_cacheLifetime) };
-
-            // Return the price, or null if there is no DevTest price
-            return price;
-        }
-        finally
-        {
-            mylock.Release();
-        }
+        return prices;
     }
-}
-
-
-public class CacheEntry
-{
-    public double? Price { get; set; }
-    public DateTime Expiry { get; set; }
 }

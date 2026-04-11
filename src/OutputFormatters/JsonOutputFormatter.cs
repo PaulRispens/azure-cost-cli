@@ -126,6 +126,12 @@ public class JsonOutputFormatter : BaseOutputFormatter
         
         return Task.CompletedTask;
     }
+
+    public override Task WriteDevTestComparison(WhatIfSettings settings, IEnumerable<DevTestComparisonItem> items)
+    {
+        WriteJson(settings, items);
+        return Task.CompletedTask;
+    }
     
 public override Task WriteAccumulatedDiffCost(DiffSettings settings, AccumulatedCostDetails accumulatedCostSource,
     AccumulatedCostDetails accumulatedCostTarget)

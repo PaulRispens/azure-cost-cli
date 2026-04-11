@@ -24,10 +24,27 @@ public abstract class BaseOutputFormatter
     public abstract Task WriteRegions(RegionsSettings settings, IReadOnlyCollection<AzureRegion> regions);
     public abstract Task WriteCostByTag(CostByTagSettings settings, Dictionary<string, Dictionary<string, List<CostResourceItem>>> byTags);
     public abstract Task WritePricesPerRegion(WhatIfSettings settings, Dictionary<UsageDetails,List<PriceRecord>> pricesByRegion);
+    public abstract Task WriteDevTestComparison(WhatIfSettings settings, IEnumerable<DevTestComparisonItem> items);
     public abstract Task WriteAccumulatedDiffCost(DiffSettings settings, AccumulatedCostDetails accumulatedCostSource,
         AccumulatedCostDetails accumulatedCostTarget);
 
 }
+
+public record DevTestComparisonItem(
+    string ResourceName,
+    string ResourceGroup,
+    string Product,
+    string MeterName,
+    string Region,
+    string Currency,
+    string UnitOfMeasure,
+    double Quantity,
+    double CurrentUnitPrice,
+    double CurrentCost,
+    double? DevTestUnitPrice,
+    double? DevTestCost,
+    double? Savings,
+    double? SavingsPercentage);
 
 public record AccumulatedCostDetails( 
     Subscription? Subscription,

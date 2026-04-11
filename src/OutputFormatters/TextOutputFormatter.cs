@@ -290,5 +290,39 @@ public class TextOutputFormatter : BaseOutputFormatter
 
         return Task.CompletedTask;
     }
+
+    public override Task WriteDevTestComparison(WhatIfSettings settings, IEnumerable<DevTestComparisonItem> items)
+    {
+        var itemList = items.ToList();
+        if (itemList.Count == 0)
+        {
+            Console.WriteLine("No Virtual Machine resources found for DevTest comparison.");
+            return Task.CompletedTask;
+        }
+
+        Console.WriteLine("DevTest Pricing Comparison");
+        Console.WriteLine(new string('=', 60));
+
+        foreach (var item in itemList.OrderByDescending(i => i.Savings ?? 0))
+        {
+            Console.WriteLine($"Resource: {item.ResourceName} ({item.ResourceGroup})");
+            Console.WriteLine($"  Meter: {item.MeterName} | Region: {item.Region}");
+            Console.WriteLine($"  Quantity: {item.Quantity:N2} {item.UnitOfMeasure}");
+            Console.WriteLine($"  Current Cost: {item.CurrentCost:N2} {item.Currency}");
+            Console.WriteLine($"  DevTest Cost: {(item.DevTestCost.HasValue ? $"{item.DevTestCost:N2} {item.Currency}" : "N/A")}");
+            Console.WriteLine($"  Savings: {(item.Savings.HasValue ? $"{item.Savings:N2} {item.Currency} ({item.SavingsPercentage:N1}%)" : "N/A")}");
+            Console.WriteLine();
+        }
+
+        var totalCurrent = itemList.Sum(i => i.CurrentCost);
+        var totalDevTest = itemList.Where(i => i.DevTestCost.HasValue).Sum(i => i.DevTestCost!.Value);
+        var totalSavings = totalCurrent - totalDevTest;
+        var currency = itemList.First().Currency;
+        Console.WriteLine($"Total Current Cost: {totalCurrent:N2} {currency}");
+        Console.WriteLine($"Total DevTest Cost: {totalDevTest:N2} {currency}");
+        Console.WriteLine($"Total Savings: {totalSavings:N2} {currency} ({(totalCurrent > 0 ? totalSavings / totalCurrent * 100 : 0):N1}%)");
+
+        return Task.CompletedTask;
+    }
     
 }

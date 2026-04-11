@@ -35,6 +35,7 @@ registrations.AddHttpClient("RegionsApi", client =>
 {
   client.BaseAddress = new Uri("https://datacenters.microsoft.com/");
   client.DefaultRequestHeaders.Add("Accept", "application/json");
+  client.DefaultRequestHeaders.Add("User-Agent", "azure-cost-cli");
 }).AddPolicyHandler(PollyPolicyExtensions.GetRetryAfterPolicy());
 
 
@@ -104,7 +105,7 @@ app.Configure(config =>
   
   config.AddBranch<WhatIfSettings>("what-if", add =>
   {
-   // add.AddCommand<DevTestWhatIfCommand>("devtest").WithDescription("Run what-if scenarios for DevTest subscriptions");
+    add.AddCommand<DevTestWhatIfCommand>("devtest").WithDescription("Run what-if scenarios to check price differences if the resources were on a DevTest subscription. Only applies to VMs.");
     add.AddCommand<RegionWhatIfCommand>("region").WithDescription("Run what-if scenarios to check price differences if the resources would have run in a different region. Only applies to VMs.");
     add.SetDescription("Run what-if scenarios");
   });

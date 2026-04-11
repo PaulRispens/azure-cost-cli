@@ -149,6 +149,63 @@ public class CsvOutputFormatter : BaseOutputFormatter
     public override Task WriteAccumulatedDiffCost(DiffSettings settings, AccumulatedCostDetails accumulatedCostSource,
         AccumulatedCostDetails accumulatedCostTarget)
     {
+        var rows = new List<DiffCsvRow>();
+        
+        AddDiffRows(rows, "ServiceName", accumulatedCostSource.ByServiceNameCosts.ToList(),
+            accumulatedCostTarget.ByServiceNameCosts.ToList(), settings.UseUSD);
+        AddDiffRows(rows, "Location", accumulatedCostSource.ByLocationCosts.ToList(),
+            accumulatedCostTarget.ByLocationCosts.ToList(), settings.UseUSD);
+        AddDiffRows(rows, "ResourceGroup", accumulatedCostSource.ByResourceGroupCosts.ToList(),
+            accumulatedCostTarget.ByResourceGroupCosts.ToList(), settings.UseUSD);
+        
+        return ExportDiffToCsv(settings.SkipHeader, rows);
+    }
+    
+    private static void AddDiffRows(List<DiffCsvRow> rows, string category,
+        List<CostNamedItem> sourceItems, List<CostNamedItem> targetItems, bool useUsd)
+    {
+        var allNames = sourceItems.Select(a => a.ItemName)
+            .Union(targetItems.Select(a => a.ItemName))
+            .Distinct()
+            .OrderBy(a => a);
+        
+        foreach (var name in allNames)
+        {
+            var sourceCost = sourceItems.Where(a => a.ItemName == name)
+                .Sum(a => useUsd ? a.CostUsd : a.Cost);
+            var targetCost = targetItems.Where(a => a.ItemName == name)
+                .Sum(a => useUsd ? a.CostUsd : a.Cost);
+            var currency = useUsd ? "USD" :
+                sourceItems.FirstOrDefault(a => a.ItemName == name)?.Currency ??
+                targetItems.FirstOrDefault(a => a.ItemName == name)?.Currency ?? "USD";
+            
+            rows.Add(new DiffCsvRow
+            {
+                Category = category,
+                Name = name,
+                SourceCost = sourceCost,
+                TargetCost = targetCost,
+                Diff = targetCost - sourceCost,
+                Currency = currency
+            });
+        }
+    }
+    
+    private static Task ExportDiffToCsv(bool skipHeader, IEnumerable<DiffCsvRow> rows)
+    {
+        var config = new CsvConfiguration(CultureInfo.CurrentCulture)
+        {
+            HasHeaderRecord = skipHeader == false
+        };
+
+        using (var writer = new StringWriter())
+        using (var csv = new CsvWriter(writer, config))
+        {
+            csv.Context.TypeConverterCache.AddConverter<double>(new CustomDoubleConverter());
+            csv.WriteRecords(rows);
+            Console.Write(writer.ToString());
+        }
+
         return Task.CompletedTask;
     }
 
@@ -201,4 +258,14 @@ public class CustomDoubleConverter : DoubleConverter
             _ => throw new InvalidOperationException("The value is not a double.")
         };
     }
+}
+
+public class DiffCsvRow
+{
+    public string Category { get; set; }
+    public string Name { get; set; }
+    public double SourceCost { get; set; }
+    public double TargetCost { get; set; }
+    public double Diff { get; set; }
+    public string Currency { get; set; }
 }

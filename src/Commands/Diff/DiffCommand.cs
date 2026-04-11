@@ -4,11 +4,19 @@ using AzureCostCli.OutputFormatters;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
+using StatusContext = AzureCostCli.OutputFormatters.SpectreConsole.StatusContext;
+
 namespace AzureCostCli.Commands.Diff;
 
 public class DiffCommand : AsyncCommand<DiffSettings>
 {
+    private readonly ICostRetriever _costRetriever;
     private readonly Dictionary<OutputFormat, BaseOutputFormatter> _outputFormatters = OutputFormatterFactory.Create();
+
+    public DiffCommand(ICostRetriever costRetriever)
+    {
+        _costRetriever = costRetriever;
+    }
 
     protected override ValidationResult Validate(CommandContext context, DiffSettings settings)
     {
@@ -24,6 +32,37 @@ public class DiffCommand : AsyncCommand<DiffSettings>
             }
         }
 
+        // Check for conflicting modes: both file params and source dates
+        if (settings.HasFileParams && settings.HasSourceDates)
+        {
+            return ValidationResult.Error(
+                "Cannot use both file-based comparison (--compare-to/--compare-from) and live comparison (--source-from/--source-to) at the same time. Please use one mode or the other.");
+        }
+
+        // Live comparison mode
+        if (settings.HasSourceDates)
+        {
+            if (settings.SourceFrom!.Value > settings.SourceTo!.Value)
+            {
+                return ValidationResult.Error("The --source-from date must be before the --source-to date.");
+            }
+
+            var subResult = CommandHelpers.ValidateAndResolveSubscription(
+                settings.Subscription, settings.GetScope.IsSubscriptionBased,
+                id => settings.Subscription = id);
+            if (!subResult.Successful) return subResult;
+
+            return ValidationResult.Success();
+        }
+
+        // Partial source dates
+        if (settings.SourceFrom.HasValue != settings.SourceTo.HasValue)
+        {
+            return ValidationResult.Error(
+                "Both --source-from and --source-to must be provided for live comparison.");
+        }
+
+        // File-based comparison mode
         const string CompareToMessage =
             "The compare to file does not exist or is not specified. Please create the json file by running `azure-cost accumulatedCost -o json > filename.json`";
         const string CompareFromMessage =
@@ -70,18 +109,97 @@ public class DiffCommand : AsyncCommand<DiffSettings>
         AccumulatedCostDetails accumulatedCostSource = null;
         AccumulatedCostDetails accumulatedCostTarget = null;
 
-        await AnsiConsoleExt.Status()
-            .StartAsync("Reading data", async ctx =>
-            {
-                accumulatedCostSource = await ReadAccumulatedCost(settings.CompareFrom);
-                accumulatedCostTarget = await ReadAccumulatedCost(settings.CompareTo);
-            });
+        if (settings.HasSourceDates)
+        {
+            // Live comparison mode: fetch both periods from Azure Cost API
+            _costRetriever.CostApiAddress = settings.CostApiAddress;
+            _costRetriever.HttpTimeout = TimeSpan.FromSeconds(settings.HttpTimeout);
+
+            await AnsiConsoleExt.Status()
+                .StartAsync("Fetching cost data...", async ctx =>
+                {
+                    Subscription subscription = null;
+
+                    if (settings.GetScope.IsSubscriptionBased)
+                    {
+                        ctx.Status = "Fetching subscription details...";
+                        subscription = await _costRetriever.RetrieveSubscription(settings.Debug, settings.Subscription!.Value);
+                    }
+                    else
+                    {
+                        var enrollmentIdDisplayName = settings.EnrollmentAccountId != null ? $" {settings.EnrollmentAccountId}" : "";
+                        var billingIdDisplayName = settings.BillingAccountId != null ? $" {settings.BillingAccountId}" : "";
+                        subscription = new Subscription(string.Empty, string.Empty, Array.Empty<object>(), settings.GetScope.Name, settings.GetScope.Name, $"{settings.GetScope.Name} {enrollmentIdDisplayName} {billingIdDisplayName}", "Active", new SubscriptionPolicies(string.Empty, string.Empty, string.Empty));
+                    }
+
+                    ctx.Status = "Fetching source period costs...";
+                    accumulatedCostSource = await FetchAccumulatedCostDetails(settings, subscription,
+                        settings.SourceFrom!.Value, settings.SourceTo!.Value, ctx);
+
+                    ctx.Status = "Fetching target period costs...";
+                    accumulatedCostTarget = await FetchAccumulatedCostDetails(settings, subscription,
+                        settings.GetFromDate(), settings.GetToDate(), ctx);
+                });
+        }
+        else
+        {
+            // File-based comparison mode
+            await AnsiConsoleExt.Status()
+                .StartAsync("Reading data", async ctx =>
+                {
+                    accumulatedCostSource = await ReadAccumulatedCost(settings.CompareFrom);
+                    accumulatedCostTarget = await ReadAccumulatedCost(settings.CompareTo);
+                });
+        }
 
         // Write the output
         await _outputFormatters[settings.Output]
             .WriteAccumulatedDiffCost(settings, accumulatedCostSource, accumulatedCostTarget);
 
         return 0;
+    }
+
+    private async Task<AccumulatedCostDetails> FetchAccumulatedCostDetails(DiffSettings settings,
+        Subscription subscription, DateOnly fromDate, DateOnly toDate, StatusContext ctx)
+    {
+        var costs = await _costRetriever.RetrieveCosts(settings.Debug, settings.GetScope,
+            settings.Filter, settings.Metric, TimeframeType.Custom, fromDate, toDate);
+
+        List<CostItem> forecastedCosts = new List<CostItem>();
+
+        DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (toDate >= today)
+        {
+            DateOnly forecastEndDate = new DateOnly(toDate.Year, toDate.Month,
+                DateTime.DaysInMonth(toDate.Year, toDate.Month));
+
+            ctx.Status = "Fetching forecasted cost data...";
+            forecastedCosts = (await _costRetriever.RetrieveForecastedCosts(settings.Debug, settings.GetScope,
+                settings.Filter, settings.Metric, TimeframeType.Custom, today, forecastEndDate)).ToList();
+        }
+
+        IEnumerable<CostNamedItem> bySubscriptionCosts = null;
+        if (settings.GetScope.IsSubscriptionBased == false)
+        {
+            ctx.Status = "Fetching cost data by subscription...";
+            bySubscriptionCosts = await _costRetriever.RetrieveCostBySubscription(settings.Debug,
+                settings.GetScope, settings.Filter, settings.Metric, TimeframeType.Custom, fromDate, toDate);
+        }
+
+        ctx.Status = "Fetching cost data by service name...";
+        var byServiceNameCosts = await _costRetriever.RetrieveCostByServiceName(settings.Debug,
+            settings.GetScope, settings.Filter, settings.Metric, TimeframeType.Custom, fromDate, toDate);
+
+        ctx.Status = "Fetching cost data by location...";
+        var byLocationCosts = await _costRetriever.RetrieveCostByLocation(settings.Debug, settings.GetScope,
+            settings.Filter, settings.Metric, TimeframeType.Custom, fromDate, toDate);
+
+        ctx.Status = "Fetching cost data by resource group...";
+        var byResourceGroupCosts = await _costRetriever.RetrieveCostByResourceGroup(settings.Debug,
+            settings.GetScope, settings.Filter, settings.Metric, TimeframeType.Custom, fromDate, toDate);
+
+        return new AccumulatedCostDetails(subscription, null, costs, forecastedCosts, byServiceNameCosts,
+            byLocationCosts, byResourceGroupCosts, bySubscriptionCosts);
     }
 
     private async Task<AccumulatedCostDetails> ReadAccumulatedCost(string file)

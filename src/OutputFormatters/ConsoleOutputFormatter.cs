@@ -303,6 +303,10 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
                 .Title("Budgets")
                 .AddColumn("Name")
                 .AddColumn("Amount")
+                .AddColumn("Status")
+                .AddColumn("Current Spend")
+                .AddColumn("Forecast")
+                .AddColumn("Remaining")
                 .AddColumn("Time Grain")
                 .AddColumn("Notifications")
             ;
@@ -317,7 +321,6 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
                 .AddColumn("Operator")
                 .AddColumn("Threshold");
 
-
             foreach (var notification in budget.Notifications)
             {
                 notifications.AddRow(new Markup(notification.Name),
@@ -325,8 +328,57 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
                     new Markup(notification.Operator), new Markup(notification.Threshold.ToString("N2")));
             }
 
-            table.AddRow(new Markup($"[bold]{budget.Name}[/]"), new Markup(budget.Amount.ToString("N2")),
-                new Markup(budget.TimeGrain), notifications);
+            // Status with color
+            var status = BudgetStatusHelper.GetStatus(budget);
+            var statusMarkup = status switch
+            {
+                "EXCEEDED" => new Markup($"[bold red]{status}[/]"),
+                "AT-RISK" => new Markup($"[bold yellow]{status}[/]"),
+                _ => new Markup($"[bold green]{status}[/]")
+            };
+
+            // Current spend with progress bar
+            string spendText;
+            if (budget.CurrentSpendAmount.HasValue)
+            {
+                var spendPct = budget.Amount > 0 ? budget.CurrentSpendAmount.Value / budget.Amount * 100 : 0;
+                var barLength = (int)Math.Clamp(Math.Round(spendPct / 5), 0, 20);
+                var bar = new string('█', barLength) + new string('░', 20 - barLength);
+                var barColor = spendPct >= 100 ? "red" : spendPct >= 80 ? "yellow" : "green";
+                spendText = $"[{barColor}]{bar}[/] {budget.CurrentSpendAmount.Value:N2} {budget.CurrentSpendCurrency} ({spendPct:N1}%)";
+            }
+            else
+            {
+                spendText = "[dim]N/A[/]";
+            }
+
+            // Forecast
+            string forecastText;
+            if (budget.ForecastAmount.HasValue)
+            {
+                var forecastPct = budget.Amount > 0 ? budget.ForecastAmount.Value / budget.Amount * 100 : 0;
+                var forecastColor = forecastPct >= 100 ? "red" : forecastPct >= 80 ? "yellow" : "green";
+                forecastText = $"[{forecastColor}]{budget.ForecastAmount.Value:N2} {budget.ForecastCurrency} ({forecastPct:N1}%)[/]";
+            }
+            else
+            {
+                forecastText = "[dim]N/A[/]";
+            }
+
+            // Remaining
+            var remaining = budget.CurrentSpendAmount.HasValue ? budget.Amount - budget.CurrentSpendAmount.Value : budget.Amount;
+            var remainingColor = remaining < 0 ? "red" : "green";
+            var remainingText = $"[{remainingColor}]{remaining:N2}[/]";
+
+            table.AddRow(
+                new Markup($"[bold]{budget.Name.EscapeMarkup()}[/]"),
+                new Markup(budget.Amount.ToString("N2")),
+                statusMarkup,
+                new Markup(spendText),
+                new Markup(forecastText),
+                new Markup(remainingText),
+                new Markup(budget.TimeGrain),
+                notifications);
         }
 
         AnsiConsole.Write(table);

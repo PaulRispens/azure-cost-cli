@@ -264,6 +264,36 @@ public class MarkdownOutputFormatter : BaseOutputFormatter
             Console.WriteLine();
         }
 
+        // Summary table
+        Console.WriteLine("| Budget | Amount | Status | Current Spend | Forecast | Remaining |");
+        Console.WriteLine("|--------|--------|--------|---------------|----------|-----------|");
+
+        foreach (var budget in budgets.OrderByDescending(a=>a.Name))
+        {
+            var status = BudgetStatusHelper.GetStatus(budget);
+            var statusEmoji = status switch
+            {
+                "EXCEEDED" => "🔴 EXCEEDED",
+                "AT-RISK" => "🟡 AT-RISK",
+                _ => "🟢 OK"
+            };
+
+            var spendText = budget.CurrentSpendAmount.HasValue
+                ? $"{budget.CurrentSpendAmount.Value:N2} {budget.CurrentSpendCurrency} ({(budget.Amount > 0 ? budget.CurrentSpendAmount.Value / budget.Amount * 100 : 0):N1}%)"
+                : "N/A";
+
+            var forecastText = budget.ForecastAmount.HasValue
+                ? $"{budget.ForecastAmount.Value:N2} {budget.ForecastCurrency} ({(budget.Amount > 0 ? budget.ForecastAmount.Value / budget.Amount * 100 : 0):N1}%)"
+                : "N/A";
+
+            var remaining = budget.CurrentSpendAmount.HasValue ? budget.Amount - budget.CurrentSpendAmount.Value : budget.Amount;
+
+            var escapedName = budget.Name.Replace("|", "\\|").Replace("\n", " ").Replace("\r", "");
+            Console.WriteLine($"| {escapedName} | {budget.Amount:N2} | {statusEmoji} | {spendText} | {forecastText} | {remaining:N2} |");
+        }
+
+        Console.WriteLine();
+
         foreach (var budget in budgets.OrderByDescending(a=>a.Name))
         {
             Console.WriteLine(

@@ -288,11 +288,23 @@ azure-cost detectAnomalies
 
 ### Budgets
 
-This will retrieve the available budgets for the subscription. It will show the current status of the budget and the amount of the budget. As well as listing the configured notifications. 
+This will retrieve the available budgets for the subscription. It will show the current status of the budget and the amount of the budget. It now also includes **spend tracking** information:
+
+- **Current Spend**: How much has been spent in the current budget period, with percentage of budget used
+- **Forecast**: Projected spend for the budget period, with percentage of budget
+- **Status**: Budget health indicator:
+  - 🟢 **OK** — spend is below 80% of budget
+  - 🟡 **AT-RISK** — spend is between 80-99% of budget
+  - 🔴 **EXCEEDED** — spend has reached or exceeded the budget amount
+- **Remaining**: How much budget remains
+
+As well as listing the configured notifications. 
 
 ```bash
 azure-cost budgets -s 574385a9-08e9-49fe-91a2-27660d92b8f5 
 ```
+
+Output is available in all formats (`-o text`, `-o json`, `-o markdown`, `-o csv`, `-o console`).
 
 ### Regions
 

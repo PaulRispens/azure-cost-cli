@@ -149,8 +149,62 @@ public class CsvOutputFormatter : BaseOutputFormatter
     public override Task WriteAccumulatedDiffCost(DiffSettings settings, AccumulatedCostDetails accumulatedCostSource,
         AccumulatedCostDetails accumulatedCostTarget)
     {
-        return Task.CompletedTask;
+        var diffRows = new List<object>();
+
+        AddDiffRows(diffRows, "ServiceName", accumulatedCostSource.ByServiceNameCosts.ToList(),
+            accumulatedCostTarget.ByServiceNameCosts.ToList(), settings.UseUSD);
+        AddDiffRows(diffRows, "Location", accumulatedCostSource.ByLocationCosts.ToList(),
+            accumulatedCostTarget.ByLocationCosts.ToList(), settings.UseUSD);
+        AddDiffRows(diffRows, "ResourceGroup", accumulatedCostSource.ByResourceGroupCosts.ToList(),
+            accumulatedCostTarget.ByResourceGroupCosts.ToList(), settings.UseUSD);
+
+        return ExportToCsv(settings.SkipHeader, diffRows);
     }
+
+    private static void AddDiffRows(List<object> rows, string category,
+        List<CostNamedItem> sourceItems, List<CostNamedItem> targetItems, bool useUSD)
+    {
+        var sourceCosts = sourceItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Sum(a => useUSD ? a.CostUsd : a.Cost));
+
+        var targetCosts = targetItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Sum(a => useUSD ? a.CostUsd : a.Cost));
+
+        var sourceCurrencies = sourceItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(group => group.Key, group => group.First().Currency);
+
+        var targetCurrencies = targetItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(group => group.Key, group => group.First().Currency);
+
+        var allNames = sourceCosts.Keys
+            .Union(targetCosts.Keys)
+            .ToList();
+
+        foreach (var name in allNames)
+        {
+            sourceCosts.TryGetValue(name, out var sourceCost);
+            targetCosts.TryGetValue(name, out var targetCost);
+
+            var diff = targetCost - sourceCost;
+            var currency =
+                (sourceCurrencies.TryGetValue(name, out var sourceCurrency) ? sourceCurrency : null)
+                ?? (targetCurrencies.TryGetValue(name, out var targetCurrency) ? targetCurrency : null)
+                ?? "USD";
+
+            rows.Add(new CostDiffRecord(category, name, sourceCost, targetCost, diff,
+                useUSD ? "USD" : currency));
+        }
+    }
+
+    private record CostDiffRecord(string Category, string Name, double SourceCost, double TargetCost, double Change, string Currency);
 
     public override Task WriteDevTestComparison(WhatIfSettings settings, IEnumerable<DevTestComparisonItem> items)
     {

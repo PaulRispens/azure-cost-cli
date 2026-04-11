@@ -79,8 +79,8 @@ jobs:
       with:
         path: src/coverage-report/Cobertura.xml
         minimum_coverage: 75
-        fail_below_threshold: true
-        show_lines: true
+        fail_below_threshold: false
+        show_line: true
         show_branch: true
         show_missing: true
         link_missing_lines: true

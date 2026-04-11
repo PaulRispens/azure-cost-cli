@@ -193,6 +193,12 @@ This will retrieve the cost of the subscription by the provided tag key(s). So i
 azure-cost costByTag  --tag cost-center --tag creator
 ```
 
+By default, resources without the specified tag(s) are included in an `(untagged)` group, making it easy to see what percentage of spend is properly tagged. To exclude untagged resources (the old behavior), use `--include-untagged false`:
+
+```bash
+azure-cost costByTag --tag cost-center --include-untagged false
+```
+
 The csv, json(c) and console output will render the results, either hierarchically or flattened in the case of the csv export.
 
 If you require more formatters, let me know!

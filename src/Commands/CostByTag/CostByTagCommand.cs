@@ -47,7 +47,7 @@ public class CostByTagCommand : AsyncCommand<CostByTagSettings>
                     settings.GetToDate());
             });
 
-        var byTags = GetResourcesByTag(resources, settings.Tags.ToArray());
+        var byTags = GetResourcesByTag(resources, settings.IncludeUntagged, settings.Tags.ToArray());
 
         // Write the output
         await _outputFormatters[settings.Output]
@@ -56,9 +56,11 @@ public class CostByTagCommand : AsyncCommand<CostByTagSettings>
         return 0;
     }
 
-    private Dictionary<string, Dictionary<string, List<CostResourceItem>>> GetResourcesByTag(
-        IEnumerable<CostResourceItem> resources, params string[] tags)
+    public static Dictionary<string, Dictionary<string, List<CostResourceItem>>> GetResourcesByTag(
+        IEnumerable<CostResourceItem> resources, bool includeUntagged, params string[] tags)
     {
+        const string untaggedGroup = "(untagged)";
+
         var resourcesByTag =
             new Dictionary<string, Dictionary<string, List<CostResourceItem>>>(StringComparer.OrdinalIgnoreCase);
 
@@ -71,7 +73,9 @@ public class CostByTagCommand : AsyncCommand<CostByTagSettings>
         {
             foreach (var tag in tags)
             {
-                var resourceTags = new Dictionary<string, string>(resource.Tags, StringComparer.OrdinalIgnoreCase);
+                var resourceTags = resource.Tags != null
+                    ? new Dictionary<string, string>(resource.Tags, StringComparer.OrdinalIgnoreCase)
+                    : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
                 if (resourceTags.TryGetValue(tag, out var tagValue))
                 {
@@ -81,6 +85,15 @@ public class CostByTagCommand : AsyncCommand<CostByTagSettings>
                     }
 
                     resourcesByTag[tag][tagValue].Add(resource);
+                }
+                else if (includeUntagged)
+                {
+                    if (!resourcesByTag[tag].ContainsKey(untaggedGroup))
+                    {
+                        resourcesByTag[tag][untaggedGroup] = new List<CostResourceItem>();
+                    }
+
+                    resourcesByTag[tag][untaggedGroup].Add(resource);
                 }
             }
         }

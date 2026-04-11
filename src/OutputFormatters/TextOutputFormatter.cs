@@ -238,16 +238,37 @@ public class TextOutputFormatter : BaseOutputFormatter
     public override Task WriteAccumulatedDiffCost(DiffSettings settings, AccumulatedCostDetails accumulatedCostSource,
         AccumulatedCostDetails accumulatedCostTarget)
     {
-        var culture = CultureInfo.GetCultureInfo("en-US");
-        var currency = "USD";
-        if (!settings.UseUSD)
+        var culture = CultureInfo.CurrentCulture;
+
+        string GetPreferredCurrency()
         {
-            var firstCost = accumulatedCostSource.Costs.FirstOrDefault();
-            if (firstCost != null && !string.IsNullOrEmpty(firstCost.Currency))
+            var currencySources = new[]
             {
-                currency = firstCost.Currency;
+                accumulatedCostSource.Costs.Select(a => a.Currency),
+                accumulatedCostTarget.Costs.Select(a => a.Currency),
+                accumulatedCostSource.ByServiceNameCosts.Select(a => a.Currency),
+                accumulatedCostTarget.ByServiceNameCosts.Select(a => a.Currency),
+                accumulatedCostSource.ByLocationCosts.Select(a => a.Currency),
+                accumulatedCostTarget.ByLocationCosts.Select(a => a.Currency),
+                accumulatedCostSource.ByResourceGroupCosts.Select(a => a.Currency),
+                accumulatedCostTarget.ByResourceGroupCosts.Select(a => a.Currency)
+            };
+
+            foreach (var currencySource in currencySources)
+            {
+                foreach (var candidateCurrency in currencySource)
+                {
+                    if (!string.IsNullOrWhiteSpace(candidateCurrency))
+                    {
+                        return candidateCurrency;
+                    }
+                }
             }
+
+            return "USD";
         }
+
+        var currency = settings.UseUSD ? "USD" : GetPreferredCurrency();
 
         var sourceRange = accumulatedCostSource.Costs.Any()
             ? $"{accumulatedCostSource.Costs.Min(a => a.Date)} to {accumulatedCostSource.Costs.Max(a => a.Date)}"
@@ -297,18 +318,26 @@ public class TextOutputFormatter : BaseOutputFormatter
         string currency,
         CultureInfo culture)
     {
-        var allItems = sourceItems.Select(a => a.ItemName)
-            .Union(targetItems.Select(a => a.ItemName))
+        var sourceCosts = sourceItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(g => g.Key, g => g.Sum(a => useUSD ? a.CostUsd : a.Cost));
+
+        var targetCosts = targetItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(g => g.Key, g => g.Sum(a => useUSD ? a.CostUsd : a.Cost));
+
+        var allItems = sourceCosts.Keys
+            .Union(targetCosts.Keys)
             .OrderByDescending(name =>
                 Math.Max(
-                    sourceItems.Where(a => a.ItemName == name).Sum(a => useUSD ? a.CostUsd : a.Cost),
-                    targetItems.Where(a => a.ItemName == name).Sum(a => useUSD ? a.CostUsd : a.Cost)))
+                    sourceCosts.GetValueOrDefault(name),
+                    targetCosts.GetValueOrDefault(name)))
             .ToList();
 
         foreach (var item in allItems)
         {
-            var sourceCost = sourceItems.Where(a => a.ItemName == item).Sum(a => useUSD ? a.CostUsd : a.Cost);
-            var targetCost = targetItems.Where(a => a.ItemName == item).Sum(a => useUSD ? a.CostUsd : a.Cost);
+            sourceCosts.TryGetValue(item, out var sourceCost);
+            targetCosts.TryGetValue(item, out var targetCost);
             var diff = targetCost - sourceCost;
             var diffSign = diff >= 0 ? "+" : "";
             Console.WriteLine($"  {item}: {sourceCost.ToString("N2", culture)} -> {targetCost.ToString("N2", culture)} ({diffSign}{diff.ToString("N2", culture)}) {currency}");

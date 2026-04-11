@@ -55,7 +55,7 @@ public class FormatterGapTests
     #region TextOutputFormatter.WriteAccumulatedDiffCost
 
     [Fact]
-    public async Task Text_WriteAccumulatedDiffCost_ProducesOutput()
+    public void Text_WriteAccumulatedDiffCost_ProducesOutput()
     {
         var formatter = new TextOutputFormatter();
         var source = CreateSampleDiffDetails(1.0);
@@ -75,7 +75,7 @@ public class FormatterGapTests
     }
 
     [Fact]
-    public async Task Text_WriteAccumulatedDiffCost_ShowsChangeSign()
+    public void Text_WriteAccumulatedDiffCost_ShowsChangeSign()
     {
         var formatter = new TextOutputFormatter();
         var source = CreateSampleDiffDetails(1.0);
@@ -89,7 +89,7 @@ public class FormatterGapTests
     }
 
     [Fact]
-    public async Task Text_WriteAccumulatedDiffCost_EmptyCosts_ProducesOutput()
+    public void Text_WriteAccumulatedDiffCost_EmptyCosts_ProducesOutput()
     {
         var formatter = new TextOutputFormatter();
         var empty = new AccumulatedCostDetails(
@@ -111,7 +111,7 @@ public class FormatterGapTests
     #region CsvOutputFormatter.WriteAccumulatedDiffCost
 
     [Fact]
-    public async Task Csv_WriteAccumulatedDiffCost_ProducesOutput()
+    public void Csv_WriteAccumulatedDiffCost_ProducesOutput()
     {
         var formatter = new CsvOutputFormatter();
         var source = CreateSampleDiffDetails(1.0);
@@ -130,7 +130,7 @@ public class FormatterGapTests
     }
 
     [Fact]
-    public async Task Csv_WriteAccumulatedDiffCost_ContainsAllCategories()
+    public void Csv_WriteAccumulatedDiffCost_ContainsAllCategories()
     {
         var formatter = new CsvOutputFormatter();
         var source = CreateSampleDiffDetails(1.0);
@@ -148,7 +148,7 @@ public class FormatterGapTests
     }
 
     [Fact]
-    public async Task Csv_WriteAccumulatedDiffCost_EmptyCosts_ProducesEmptyOutput()
+    public void Csv_WriteAccumulatedDiffCost_EmptyCosts_ProducesEmptyOutput()
     {
         var formatter = new CsvOutputFormatter();
         var empty = new AccumulatedCostDetails(
@@ -165,7 +165,7 @@ public class FormatterGapTests
     }
 
     [Fact]
-    public async Task Csv_WriteAccumulatedDiffCost_SkipHeader()
+    public void Csv_WriteAccumulatedDiffCost_SkipHeader()
     {
         var formatter = new CsvOutputFormatter();
         var source = CreateSampleDiffDetails(1.0);

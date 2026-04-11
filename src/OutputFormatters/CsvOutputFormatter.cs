@@ -164,17 +164,40 @@ public class CsvOutputFormatter : BaseOutputFormatter
     private static void AddDiffRows(List<object> rows, string category,
         List<CostNamedItem> sourceItems, List<CostNamedItem> targetItems, bool useUSD)
     {
-        var allNames = sourceItems.Select(a => a.ItemName)
-            .Union(targetItems.Select(a => a.ItemName))
-            .Distinct()
+        var sourceCosts = sourceItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Sum(a => useUSD ? a.CostUsd : a.Cost));
+
+        var targetCosts = targetItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Sum(a => useUSD ? a.CostUsd : a.Cost));
+
+        var sourceCurrencies = sourceItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(group => group.Key, group => group.First().Currency);
+
+        var targetCurrencies = targetItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(group => group.Key, group => group.First().Currency);
+
+        var allNames = sourceCosts.Keys
+            .Union(targetCosts.Keys)
             .ToList();
 
         foreach (var name in allNames)
         {
-            var sourceCost = sourceItems.Where(a => a.ItemName == name).Sum(a => useUSD ? a.CostUsd : a.Cost);
-            var targetCost = targetItems.Where(a => a.ItemName == name).Sum(a => useUSD ? a.CostUsd : a.Cost);
+            sourceCosts.TryGetValue(name, out var sourceCost);
+            targetCosts.TryGetValue(name, out var targetCost);
+
             var diff = targetCost - sourceCost;
-            var currency = sourceItems.Concat(targetItems).FirstOrDefault(a => a.ItemName == name)?.Currency ?? "USD";
+            var currency =
+                (sourceCurrencies.TryGetValue(name, out var sourceCurrency) ? sourceCurrency : null)
+                ?? (targetCurrencies.TryGetValue(name, out var targetCurrency) ? targetCurrency : null)
+                ?? "USD";
 
             rows.Add(new CostDiffRecord(category, name, sourceCost, targetCost, diff,
                 useUSD ? "USD" : currency));

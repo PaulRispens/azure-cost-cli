@@ -518,16 +518,58 @@ public class MarkdownOutputFormatter : BaseOutputFormatter
     
     public override Task WriteRegions(RegionsSettings settings, IReadOnlyCollection<AzureRegion> regions)
     {
-        throw new NotImplementedException();
+        Console.WriteLine("# Azure Regions");
+        Console.WriteLine();
+        Console.WriteLine("|Region|Geography|Display Name|Location|");
+        Console.WriteLine("|---|---|---|---|");
+
+        foreach (var region in regions.OrderBy(a => a.continent).ThenBy(a => a.geographyId))
+        {
+            Console.WriteLine($"|{region.continent}|{region.geographyId}|{region.displayName}|{region.location}|");
+        }
+
+        return Task.CompletedTask;
     }
 
     public override Task WriteCostByTag(CostByTagSettings settings, Dictionary<string, Dictionary<string, List<CostResourceItem>>> byTags)
     {
-        throw new NotImplementedException();
+        foreach (var (tagKey, tagValues) in byTags)
+        {
+            Console.WriteLine($"## Tag: {tagKey}");
+            Console.WriteLine();
+            Console.WriteLine("|Tag Value|Cost|Resources|");
+            Console.WriteLine("|---|---:|---:|");
+
+            foreach (var (tagValue, resources) in tagValues.OrderByDescending(kv => kv.Value.Sum(r => r.Cost)))
+            {
+                var totalCost = resources.Sum(r => settings.UseUSD ? r.CostUSD : r.Cost);
+                var currency = resources.FirstOrDefault()?.Currency ?? "USD";
+                Console.WriteLine($"|{tagValue}|{totalCost:N2} {currency}|{resources.Count}|");
+            }
+
+            Console.WriteLine();
+        }
+
+        return Task.CompletedTask;
     }
 
     public override Task WritePricesPerRegion(WhatIfSettings settings, Dictionary<UsageDetails, List<PriceRecord>> pricesByRegion)
     {
-        throw new NotImplementedException();
+        foreach (var (resource, prices) in pricesByRegion)
+        {
+            Console.WriteLine($"## {resource.name} ({resource.properties?.meterDetails?.meterName})");
+            Console.WriteLine();
+            Console.WriteLine("|Region|Retail Price|Unit|");
+            Console.WriteLine("|---|---:|---|");
+
+            foreach (var price in prices.OrderBy(p => p.RetailPrice))
+            {
+                Console.WriteLine($"|{price.ArmRegionName}|{price.RetailPrice:N4} {price.CurrencyCode}|{price.UnitOfMeasure}|");
+            }
+
+            Console.WriteLine();
+        }
+
+        return Task.CompletedTask;
     }
 }

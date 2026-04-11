@@ -12,55 +12,25 @@ public class RegionWhatIfCommand : AsyncCommand<WhatIfSettings>
 {
     private readonly IPriceRetriever _priceRetriever;
     private readonly ICostRetriever _costRetriever;
+    private readonly Dictionary<OutputFormat, BaseOutputFormatter> _outputFormatters = OutputFormatterFactory.Create();
 
-    private readonly Dictionary<OutputFormat, BaseOutputFormatter> _outputFormatters = new();
-    
-  
     public RegionWhatIfCommand(IPriceRetriever priceRetriever, ICostRetriever costRetriever)
     {
         _priceRetriever = priceRetriever;
         _costRetriever = costRetriever;
+    }
 
-        // Add the output formatters
-        _outputFormatters.Add(OutputFormat.Console, new ConsoleOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Json, new JsonOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Jsonc, new JsonOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Text, new TextOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Markdown, new MarkdownOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Csv, new CsvOutputFormatter());
+    protected override ValidationResult Validate(CommandContext context, WhatIfSettings settings)
+    {
+        return CommandHelpers.ValidateAndResolveSubscription(
+            settings.Subscription, settings.GetScope.IsSubscriptionBased,
+            id => settings.Subscription = id);
     }
 
     protected override async Task<int> ExecuteAsync(CommandContext context, WhatIfSettings settings, CancellationToken cancellationToken)
     {
         _costRetriever.CostApiAddress = settings.CostApiAddress;
         _priceRetriever.PriceApiAddress = settings.PriceApiAddress;
-        
-        // Get the subscription ID from the settings
-        var subscriptionId = settings.Subscription;
-
-        if (subscriptionId.HasValue == false && (settings.GetScope.IsSubscriptionBased))
-        {
-            // Get the subscription ID from the Azure CLI
-            try
-            {
-                if (settings.Debug)
-                    AnsiConsole.WriteLine(
-                        "No subscription ID specified. Trying to retrieve the default subscription ID from Azure CLI.");
-
-                subscriptionId = Guid.Parse(AzCommand.GetDefaultAzureSubscriptionId());
-
-                if (settings.Debug)
-                    AnsiConsole.WriteLine($"Default subscription ID retrieved from az cli: {subscriptionId}");
-
-                settings.Subscription = subscriptionId;
-            }
-            catch (Exception e)
-            {
-                AnsiConsole.WriteException(new ArgumentException(
-                    "Missing subscription ID. Please specify a subscription ID or login to Azure CLI.", e));
-                return -1;
-            }
-        }
 
         // Fetch the costs from the Azure Cost Management API
         IEnumerable<UsageDetails> resources;
@@ -82,47 +52,51 @@ public class RegionWhatIfCommand : AsyncCommand<WhatIfSettings>
                     .Where(a => a.properties is
                         { consumedService: "Microsoft.Compute", meterDetails.meterCategory: "Virtual Machines" })
                     .GroupBy(a => a.properties.resourceId)
-                    .Select(a => new UsageDetails
+                    .Select(a =>
                     {
-                        id = a.Key,
-                        name = a.First().name,
-                        type = a.First().type,
-                        kind = a.First().kind,
-                        tags = a.First().tags,
-                        properties = new UsageProperties
+                        var first = a.First();
+                        return new UsageDetails
                         {
-                            meterDetails = new MeterDetails
+                            id = a.Key,
+                            name = first.name,
+                            type = first.type,
+                            kind = first.kind,
+                            tags = first.tags,
+                            properties = new UsageProperties
                             {
-                                meterCategory = a.First().properties.meterDetails.meterCategory,
-                                unitOfMeasure = a.First().properties.meterDetails.unitOfMeasure,
-                                meterName = a.First().properties.meterDetails.meterName,
-                                meterSubCategory = a.First().properties.meterDetails.meterSubCategory,
-                            },
-                            quantity = a.Sum(b => b.properties.quantity),
-                            consumedService = a.First().properties.consumedService,
-                            cost = a.Sum(b => b.properties.cost),
-                            meterId = a.First().properties.meterId,
-                            resourceGroup = a.First().properties.resourceGroup,
-                            frequency = a.First().properties.frequency,
-                            product = a.First().properties.product,
-                            additionalInfo = a.First().properties.additionalInfo,
-                            billingCurrency = a.First().properties.billingCurrency,
-                            billingProfileId = a.First().properties.billingProfileId,
-                            offerId = a.First().properties.offerId,
-                            chargeType = a.First().properties.chargeType,
-                            resourceLocation = a.First().properties.resourceLocation,
-                            resourceId = a.First().properties.resourceId,
-                            resourceName = a.First().properties.resourceName,
-                            billingProfileName = a.First().properties.billingProfileName,
-                            unitPrice = a.First().properties.unitPrice,
-                            effectivePrice = a.First().properties.effectivePrice,
-                            billingPeriodStartDate = a.First().properties.billingPeriodStartDate,
-                            billingPeriodEndDate = a.First().properties.billingPeriodEndDate,
-                            publisherType = a.First().properties.publisherType,
-                            isAzureCreditEligible = a.First().properties.isAzureCreditEligible,
-                            subscriptionName = a.First().properties.subscriptionName,
-                            subscriptionId = a.First().properties.subscriptionId,
-                        }
+                                meterDetails = new MeterDetails
+                                {
+                                    meterCategory = first.properties.meterDetails.meterCategory,
+                                    unitOfMeasure = first.properties.meterDetails.unitOfMeasure,
+                                    meterName = first.properties.meterDetails.meterName,
+                                    meterSubCategory = first.properties.meterDetails.meterSubCategory,
+                                },
+                                quantity = a.Sum(b => b.properties.quantity),
+                                consumedService = first.properties.consumedService,
+                                cost = a.Sum(b => b.properties.cost),
+                                meterId = first.properties.meterId,
+                                resourceGroup = first.properties.resourceGroup,
+                                frequency = first.properties.frequency,
+                                product = first.properties.product,
+                                additionalInfo = first.properties.additionalInfo,
+                                billingCurrency = first.properties.billingCurrency,
+                                billingProfileId = first.properties.billingProfileId,
+                                offerId = first.properties.offerId,
+                                chargeType = first.properties.chargeType,
+                                resourceLocation = first.properties.resourceLocation,
+                                resourceId = first.properties.resourceId,
+                                resourceName = first.properties.resourceName,
+                                billingProfileName = first.properties.billingProfileName,
+                                unitPrice = first.properties.unitPrice,
+                                effectivePrice = first.properties.effectivePrice,
+                                billingPeriodStartDate = first.properties.billingPeriodStartDate,
+                                billingPeriodEndDate = first.properties.billingPeriodEndDate,
+                                publisherType = first.properties.publisherType,
+                                isAzureCreditEligible = first.properties.isAzureCreditEligible,
+                                subscriptionName = first.properties.subscriptionName,
+                                subscriptionId = first.properties.subscriptionId,
+                            }
+                        };
                     });
 
                 ctx.Status = "Running What-If analysis...";

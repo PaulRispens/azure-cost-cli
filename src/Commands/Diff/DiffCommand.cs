@@ -1,6 +1,5 @@
 using System.Text.Json;
 using AzureCostCli.CostApi;
-using AzureCostCli.Infrastructure;
 using AzureCostCli.OutputFormatters;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -9,18 +8,7 @@ namespace AzureCostCli.Commands.Diff;
 
 public class DiffCommand : AsyncCommand<DiffSettings>
 {
-    private readonly Dictionary<OutputFormat, BaseOutputFormatter> _outputFormatters = new();
-
-    public DiffCommand()
-    {
-        // Add the output formatters
-        _outputFormatters.Add(OutputFormat.Console, new ConsoleOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Json, new JsonOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Jsonc, new JsonOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Text, new TextOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Markdown, new MarkdownOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Csv, new CsvOutputFormatter());
-    }
+    private readonly Dictionary<OutputFormat, BaseOutputFormatter> _outputFormatters = OutputFormatterFactory.Create();
 
     protected override ValidationResult Validate(CommandContext context, DiffSettings settings)
     {
@@ -77,9 +65,7 @@ public class DiffCommand : AsyncCommand<DiffSettings>
 
     protected override async Task<int> ExecuteAsync(CommandContext context, DiffSettings settings, CancellationToken cancellationToken)
     {
-        // Show version
-        if (settings.Debug)
-            AnsiConsole.WriteLine($"Version: {typeof(DiffCommand).Assembly.GetName().Version}");
+        CommandHelpers.PrintVersionIfDebug(settings.Debug);
 
         AccumulatedCostDetails accumulatedCostSource = null;
         AccumulatedCostDetails accumulatedCostTarget = null;

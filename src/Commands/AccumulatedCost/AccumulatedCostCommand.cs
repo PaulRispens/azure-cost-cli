@@ -1,5 +1,4 @@
 using AzureCostCli.CostApi;
-using AzureCostCli.Infrastructure;
 using AzureCostCli.OutputFormatters;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -9,60 +8,26 @@ namespace AzureCostCli.Commands.AccumulatedCost;
 public class AccumulatedCostCommand : AsyncCommand<AccumulatedCostSettings>
 {
     private readonly ICostRetriever _costRetriever;
-
-    private readonly Dictionary<OutputFormat, BaseOutputFormatter> _outputFormatters = new();
+    private readonly Dictionary<OutputFormat, BaseOutputFormatter> _outputFormatters = OutputFormatterFactory.Create();
 
     public AccumulatedCostCommand(ICostRetriever costRetriever)
     {
         _costRetriever = costRetriever;
-
-        // Add the output formatters
-        _outputFormatters.Add(OutputFormat.Console, new ConsoleOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Json, new JsonOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Jsonc, new JsonOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Text, new TextOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Markdown, new MarkdownOutputFormatter());
-        _outputFormatters.Add(OutputFormat.Csv, new CsvOutputFormatter());
     }
 
     protected override ValidationResult Validate(CommandContext context, AccumulatedCostSettings settings)
     {
-        // Check if we have any scope parameters when the scope requires subscription
-        if (settings.GetScope.IsSubscriptionBased && !settings.Subscription.HasValue)
-        {
-            // Try to get subscription from Azure CLI
-            try
-            {
-                var subscriptionId = Guid.Parse(AzCommand.GetDefaultAzureSubscriptionId());
-                settings.Subscription = subscriptionId;
-            }
-            catch (Exception)
-            {
-                // If we can't get the subscription from Azure CLI, return an error
-                return ValidationResult.Error("No subscription ID provided and unable to retrieve from Azure CLI. Please specify a subscription ID using -s or --subscription, or login to Azure CLI using 'az login'. Use --help for more information.");
-            }
-        }
-        
-        // Automatically set timeframe to Custom if both from and to dates are provided
-        settings.ApplyAutoTimeframe();
-        
-        // Validate if the timeframe is set to Custom, then the from date must be before the to date
-        if (settings.Timeframe == TimeframeType.Custom)
-        {
-            if (settings.GetFromDate() > settings.GetToDate())
-            {
-                return ValidationResult.Error("The from date must be before the to date.");
-            }
-        }
+        var subResult = CommandHelpers.ValidateAndResolveSubscription(
+            settings.Subscription, settings.GetScope.IsSubscriptionBased,
+            id => settings.Subscription = id);
+        if (!subResult.Successful) return subResult;
 
-        return ValidationResult.Success();
+        return CommandHelpers.ValidateTimeframe(settings);
     }
 
     protected override async Task<int> ExecuteAsync(CommandContext context, AccumulatedCostSettings settings, CancellationToken cancellationToken)
     {
-        // Show version
-        if (settings.Debug)
-            AnsiConsole.WriteLine($"Version: {typeof(AccumulatedCostCommand).Assembly.GetName().Version}");
+        CommandHelpers.PrintVersionIfDebug(settings.Debug);
 
         _costRetriever.CostApiAddress = settings.CostApiAddress;
         _costRetriever.HttpTimeout = TimeSpan.FromSeconds(settings.HttpTimeout);

@@ -28,6 +28,7 @@ public class CostByTagCommandTests
         // Arrange
         var settings = new CostByTagSettings
         {
+            Subscription = Guid.NewGuid(),
             Timeframe = TimeframeType.Custom,
             From = new DateOnly(2023, 1, 1),
             To = new DateOnly(2023, 1, 31)
@@ -47,6 +48,7 @@ public class CostByTagCommandTests
         // Arrange
         var settings = new CostByTagSettings
         {
+            Subscription = Guid.NewGuid(),
             Timeframe = TimeframeType.Custom,
             From = new DateOnly(2023, 1, 31),
             To = new DateOnly(2023, 1, 1)
@@ -67,6 +69,7 @@ public class CostByTagCommandTests
         // Arrange
         var settings = new CostByTagSettings
         {
+            Subscription = Guid.NewGuid(),
             Timeframe = TimeframeType.MonthToDate
         };
         var context = CreateCommandContext();
@@ -110,6 +113,7 @@ public class DetectAnomalyCommandTests
         // Arrange
         var settings = new DetectAnomalySettings
         {
+            Subscription = Guid.NewGuid(),
             Timeframe = TimeframeType.Custom,
             From = new DateOnly(2023, 1, 1),
             To = new DateOnly(2023, 1, 31)
@@ -129,6 +133,7 @@ public class DetectAnomalyCommandTests
         // Arrange
         var settings = new DetectAnomalySettings
         {
+            Subscription = Guid.NewGuid(),
             Timeframe = TimeframeType.Custom,
             From = new DateOnly(2023, 1, 31),
             To = new DateOnly(2023, 1, 1)

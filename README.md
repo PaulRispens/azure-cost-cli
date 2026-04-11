@@ -64,7 +64,8 @@ EXAMPLES:
     azure-cost accumulatedCost -o json
     azure-cost costByResource -s 00000000-0000-0000-0000-000000000000 -o text
     azure-cost dailyCosts --dimension MeterCategory
-    azure-cost diff   --compare-to new.json --compare-from old.json 
+    azure-cost diff   --compare-to new.json --compare-from old.json
+    azure-cost diff   --source-from 2025-03-01 --source-to 2025-03-31 --from 2025-04-01 --to 2025-04-30
     azure-cost budgets -s 00000000-0000-0000-0000-000000000000
     azure-cost detectAnomalies --dimension ResourceId --recent-activity-days 4
     azure-cost costByTag --tag cost-center
@@ -341,7 +342,21 @@ azure-cost regions
 
 ### Diff
 
-Generate a difference between two cost outputs. Create the json export first using 
+Compare costs between two time periods. There are two modes:
+
+#### Live comparison (recommended)
+
+Compare two time periods directly by fetching data from the Azure Cost API:
+
+```bash
+azure-cost diff --source-from 2025-03-01 --source-to 2025-03-31 --from 2025-04-01 --to 2025-04-30
+```
+
+The `--source-from` and `--source-to` options define the baseline (source) period. The `--from` and `--to` options define the target (current) period. All standard options like `-s`, `-o`, `--useUSD`, and `--filter` work as expected.
+
+#### File-based comparison
+
+Alternatively, generate a difference between two previously exported cost outputs. Create the json export first using 
 
 ```bash
 azure-cost accumulatedCost -o json > filename.json
@@ -410,7 +425,7 @@ This will give an output like:
 
 Also, the JSON output can be used to further process the data. It will output only the differences between the two files where the cost is the actual difference.
 
-> Not all the formatters are supported for this command. Let me know if there is a need for another formatter.
+> All output formatters (Console, Json, Text, Markdown, Csv) are supported for the diff command.
 
 
 ### What-if scenarios

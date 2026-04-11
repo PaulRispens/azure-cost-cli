@@ -87,8 +87,6 @@ public class CostByResourceCommand : AsyncCommand<CostByResourceSettings>
             .WriteCostByResource(settings, outputResources, totalCount, totalCost, currency);
 
         // Check cost threshold after output
-        var totalCost = resources.Sum(r => settings.UseUSD ? r.CostUSD : r.Cost);
-        var currency = settings.UseUSD ? "USD" : resources.FirstOrDefault()?.Currency ?? "USD";
         return CommandHelpers.CheckCostThreshold(totalCost, settings.FailIfOver, currency);
     }
 }

@@ -219,7 +219,7 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
             var tree = new Tree("Cost by resources");
             tree.Guide(TreeGuide.Line);
 
-            foreach (var resource in resources.OrderByDescending(a => a.Cost))
+            foreach (var resource in resources)
             {
                 var table = new Table()
                     .Border(TableBorder.SimpleHeavy)
@@ -278,7 +278,7 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
                 .AddColumn("Tags")
                 .AddColumn("Cost", column => column.Width(15).RightAligned());
 
-            foreach (var resource in resources.OrderByDescending(a => a.Cost))
+            foreach (var resource in resources)
             {
                 table.AddRow(new Markup("[bold]" + resource.ResourceId.Split('/').Last().EscapeMarkup() + "[/]"),
                     new Markup(resource.ResourceType.EscapeMarkup()),
@@ -293,11 +293,12 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
             AnsiConsole.Write(table);
         }
 
-        if (settings.Top > 0 && totalCount > 0)
+        if (settings.Top > 0 && totalCount > 0 && settings.Top < totalCount)
         {
+            var shownCount = Math.Min(settings.Top, totalCount);
             var costDisplay = settings.UseUSD ? $"{totalCost:N2} USD" : $"{totalCost:N2} {currency}";
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[dim]Showing top {settings.Top} of {totalCount} resources (total cost: {costDisplay})[/]");
+            AnsiConsole.MarkupLine($"[dim]Showing top {shownCount} of {totalCount} resources (total cost: {costDisplay})[/]");
         }
 
         return Task.CompletedTask;

@@ -252,11 +252,12 @@ public class MarkdownOutputFormatter : BaseOutputFormatter
             }
         }
 
-        if (settings.Top > 0 && totalCount > 0)
+        if (settings.Top > 0 && totalCount > 0 && settings.Top < totalCount)
         {
+            var displayedCount = Math.Min(settings.Top, totalCount);
             var costDisplay = settings.UseUSD ? $"{totalCost:N2} USD" : $"{totalCost:N2} {currency}";
             Console.WriteLine();
-            Console.WriteLine($"> Showing top {settings.Top} of {totalCount} resources (total cost: {costDisplay})");
+            Console.WriteLine($"> Showing top {displayedCount} of {totalCount} resources (total cost: {costDisplay})");
         }
 
         return Task.CompletedTask;

@@ -275,16 +275,20 @@ public class CostByResourceCommandTests
         topped.Count.ShouldBe(5);
     }
 
-    private static List<CostResourceItem> ApplySort(IEnumerable<CostResourceItem> resources, string sort)
+    // NOTE: These sort/top tests exercise extracted sort logic that mirrors the
+    // command's switch expression. For full integration coverage (including
+    // formatter ordering), consider refactoring sort/top into a testable
+    // service that can be verified end-to-end.
+    private static List<CostResourceItem> ApplySort(IEnumerable<CostResourceItem> resources, string sort, bool useUSD = false)
     {
         IEnumerable<CostResourceItem> sorted = sort.ToLowerInvariant() switch
         {
-            "cost-asc" => resources.OrderBy(r => r.Cost),
+            "cost-asc" => resources.OrderBy(r => useUSD ? r.CostUSD : r.Cost),
             "name" => resources.OrderBy(r => r.ResourceId),
             "resource-group" => resources.OrderBy(r => r.ResourceGroupName),
             "resource-type" => resources.OrderBy(r => r.ResourceType),
             "location" => resources.OrderBy(r => r.ResourceLocation),
-            _ => resources.OrderByDescending(r => r.Cost)
+            _ => resources.OrderByDescending(r => useUSD ? r.CostUSD : r.Cost)
         };
         return sorted.ToList();
     }

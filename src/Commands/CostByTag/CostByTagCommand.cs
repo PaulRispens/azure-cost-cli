@@ -71,12 +71,12 @@ public class CostByTagCommand : AsyncCommand<CostByTagSettings>
 
         foreach (var resource in resources)
         {
+            var resourceTags = resource.Tags != null
+                ? new Dictionary<string, string>(resource.Tags, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var tag in tags)
             {
-                var resourceTags = resource.Tags != null
-                    ? new Dictionary<string, string>(resource.Tags, StringComparer.OrdinalIgnoreCase)
-                    : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
                 if (resourceTags.TryGetValue(tag, out var tagValue))
                 {
                     if (!resourcesByTag[tag].ContainsKey(tagValue))

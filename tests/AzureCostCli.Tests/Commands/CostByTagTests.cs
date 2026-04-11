@@ -21,7 +21,7 @@ public class CostByTagTests
             ServiceName: "Virtual Machines",
             ServiceTier: "Standard",
             Meter: "D2s v3",
-            Tags: tags ?? new Dictionary<string, string>(),
+            Tags: tags!,
             Currency: "USD");
     }
 

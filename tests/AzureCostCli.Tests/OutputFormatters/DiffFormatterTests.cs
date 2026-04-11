@@ -162,7 +162,7 @@ public class DiffCsvFormatterTests
         output.ShouldContain("Name");
         output.ShouldContain("SourceCost");
         output.ShouldContain("TargetCost");
-        output.ShouldContain("Diff");
+        output.ShouldContain("Change");
         output.ShouldContain("Currency");
         
         // Should have data rows

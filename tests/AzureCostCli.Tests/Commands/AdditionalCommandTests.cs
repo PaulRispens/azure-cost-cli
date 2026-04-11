@@ -151,7 +151,7 @@ public class AccumulatedCostCommandTests
     }
 
     [Fact]
-    public void Validate_WithNoSubscriptionAndNoAzureCLI_ReturnsError()
+    public void Validate_WithNoSubscription_FallsBackToAzureCLI()
     {
         // Arrange
         var settings = new AccumulatedCostSettings
@@ -161,12 +161,20 @@ public class AccumulatedCostCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
-        // Assert
-        result.Successful.ShouldBeFalse();
-        result.Message.ShouldContain("No subscription ID provided");
-        result.Message.ShouldContain("--help");
+        // Assert - behavior depends on whether Azure CLI is authenticated
+        if (result.Successful)
+        {
+            // Azure CLI is authenticated: subscription was resolved automatically
+            settings.Subscription.ShouldNotBeNull();
+        }
+        else
+        {
+            // Azure CLI is not authenticated: should return a helpful error
+            result.Message.ShouldContain("No subscription ID provided");
+            result.Message.ShouldContain("--help");
+        }
     }
 
     [Fact]
@@ -181,7 +189,7 @@ public class AccumulatedCostCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
         // Assert
         result.Successful.ShouldBeTrue();
@@ -200,7 +208,7 @@ public class AccumulatedCostCommandTests
         var context = CreateCommandContext();
 
         // Act
-        var result = _command.Validate(context, settings);
+        var result = ValidateHelper.CallValidate(_command, context, settings);
 
         // Assert
         result.Successful.ShouldBeTrue();

@@ -89,7 +89,8 @@ public class TextOutputFormatter : BaseOutputFormatter
         return Task.CompletedTask;
     }
 
-    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources)
+    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources,
+        int totalCount = 0, double totalCost = 0, string currency = "USD")
     {
         if (settings.SkipHeader == false)
         {
@@ -124,6 +125,13 @@ public class TextOutputFormatter : BaseOutputFormatter
                 }
             }
 
+        }
+
+        if (settings.Top > 0 && totalCount > 0)
+        {
+            var costDisplay = settings.UseUSD ? $"{totalCost:N2} USD" : $"{totalCost:N2} {currency}";
+            Console.WriteLine();
+            Console.WriteLine($"Showing top {settings.Top} of {totalCount} resources (total cost: {costDisplay})");
         }
       
         return Task.CompletedTask;

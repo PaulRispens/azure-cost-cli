@@ -210,7 +210,8 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
         return Task.CompletedTask;
     }
 
-    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources)
+    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources,
+        int totalCount = 0, double totalCost = 0, string currency = "USD")
     {
         // When we have meter details, we output the tree, otherwise we output a table
         if (settings.ExcludeMeterDetails == false)
@@ -290,6 +291,13 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
             }
 
             AnsiConsole.Write(table);
+        }
+
+        if (settings.Top > 0 && totalCount > 0)
+        {
+            var costDisplay = settings.UseUSD ? $"{totalCost:N2} USD" : $"{totalCost:N2} {currency}";
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"[dim]Showing top {settings.Top} of {totalCount} resources (total cost: {costDisplay})[/]");
         }
 
         return Task.CompletedTask;

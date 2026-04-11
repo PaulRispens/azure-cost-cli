@@ -212,7 +212,8 @@ public class MarkdownOutputFormatter : BaseOutputFormatter
         return Task.CompletedTask;
     }
 
-    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources)
+    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources,
+        int totalCount = 0, double totalCost = 0, string currency = "USD")
     {
 
         if (settings.ExcludeMeterDetails)
@@ -249,6 +250,13 @@ public class MarkdownOutputFormatter : BaseOutputFormatter
                 Console.WriteLine(
                     $"|{cost.ResourceId.Split('/').Last()} | {cost.ResourceType} | {cost.ResourceLocation} | {cost.ResourceGroupName} |  {cost.ServiceName} | {cost.ServiceTier} | {cost.Meter} | {(settings.UseUSD ? cost.CostUSD : cost.Cost):N2} {(settings.UseUSD ? "USD" : cost.Currency)} |");
             }
+        }
+
+        if (settings.Top > 0 && totalCount > 0)
+        {
+            var costDisplay = settings.UseUSD ? $"{totalCost:N2} USD" : $"{totalCost:N2} {currency}";
+            Console.WriteLine();
+            Console.WriteLine($"> Showing top {settings.Top} of {totalCount} resources (total cost: {costDisplay})");
         }
 
         return Task.CompletedTask;

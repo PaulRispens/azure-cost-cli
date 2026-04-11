@@ -3,6 +3,7 @@ using Shouldly;
 
 namespace AzureCostCli.Tests.Commands;
 
+[Collection("ConsoleOutputTests")]
 public class ThresholdTests
 {
     [Fact]

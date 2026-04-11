@@ -200,6 +200,28 @@ A resource can be in multiple resource locations, like Intercontinental and West
 
 You can parse out the resource name, group name and subscription id from the ResourceId field. The format is `/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}`.
 
+#### Sorting and limiting results
+
+Use `--sort` to control the order of resources. The default is `cost` (descending, most expensive first). Available options: `cost`, `cost-asc`, `name`, `resource-group`, `resource-type`, `location`.
+
+```bash
+azure-cost costByResource -s 574385a9-08e9-49fe-91a2-27660d92b8f5 --sort name
+```
+
+Use `--top N` to show only the top N resources. Use `0` to show all (the default).
+
+```bash
+azure-cost costByResource -s 574385a9-08e9-49fe-91a2-27660d92b8f5 --top 10
+```
+
+Combine both to get, for example, the 5 most expensive resources:
+
+```bash
+azure-cost costByResource -s 574385a9-08e9-49fe-91a2-27660d92b8f5 --top 5 --sort cost
+```
+
+> Note: `--top` limits the total number of resources passed to formatters. This is different from `--others-cutoff`, which collapses smaller items into an "Others" row in console output.
+
 ### Cost By Tag
 
 This will retrieve the cost of the subscription by the provided tag key(s). So if you tag your resources with, e.g. a `cost-center` or a `creator`, you can retrieve the cost of the subscription by those tags. You can specify multiple tags by using the `--tag` parameter multiple times. 

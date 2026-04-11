@@ -210,7 +210,8 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
         return Task.CompletedTask;
     }
 
-    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources)
+    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources,
+        int totalCount = 0, double totalCost = 0, string currency = "USD")
     {
         // When we have meter details, we output the tree, otherwise we output a table
         if (settings.ExcludeMeterDetails == false)
@@ -218,7 +219,7 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
             var tree = new Tree("Cost by resources");
             tree.Guide(TreeGuide.Line);
 
-            foreach (var resource in resources.OrderByDescending(a => a.Cost))
+            foreach (var resource in resources)
             {
                 var table = new Table()
                     .Border(TableBorder.SimpleHeavy)
@@ -277,7 +278,7 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
                 .AddColumn("Tags")
                 .AddColumn("Cost", column => column.Width(15).RightAligned());
 
-            foreach (var resource in resources.OrderByDescending(a => a.Cost))
+            foreach (var resource in resources)
             {
                 table.AddRow(new Markup("[bold]" + resource.ResourceId.Split('/').Last().EscapeMarkup() + "[/]"),
                     new Markup(resource.ResourceType.EscapeMarkup()),
@@ -290,6 +291,14 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
             }
 
             AnsiConsole.Write(table);
+        }
+
+        if (settings.Top > 0 && totalCount > 0 && settings.Top < totalCount)
+        {
+            var shownCount = Math.Min(settings.Top, totalCount);
+            var costDisplay = settings.UseUSD ? $"{totalCost:N2} USD" : $"{totalCost:N2} {currency}";
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"[dim]Showing top {shownCount} of {totalCount} resources (total cost: {costDisplay})[/]");
         }
 
         return Task.CompletedTask;

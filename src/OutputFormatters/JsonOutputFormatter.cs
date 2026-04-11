@@ -50,7 +50,8 @@ public class JsonOutputFormatter : BaseOutputFormatter
         return Task.CompletedTask;
     }
 
-    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources)
+    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources,
+        int totalCount = 0, double totalCost = 0, string currency = "USD")
     {
         WriteJson(settings, resources);
         

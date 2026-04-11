@@ -153,6 +153,21 @@ jobs:
 
 The last step outputs the markdown to the Job Summary. This can be used to show the cost of the subscription in the workflow summary. Use it on a schedule to get for example a daily overview. Alternatively you can use the `-o json` parameter to get the results in JSON format and use it for further processing.
 
+## CI/CD Cost Gates
+
+Use the `--fail-if-over <amount>` flag to fail a pipeline step when costs exceed a threshold. When the total cost exceeds the specified amount, the command writes a warning to stderr and exits with code 1. Output is still written normally before the check, so piped output (e.g. to a file) is not affected.
+
+Supported commands: `accumulatedCost`, `costByResource`, `dailyCosts`.
+
+### Example: GitHub Actions cost gate
+
+```yaml
+- name: Check Azure costs
+  run: azure-cost accumulatedCost -s ${{ secrets.AZURE_SUBSCRIPTION_ID }} -o json --fail-if-over 500 > costs.json
+```
+
+If costs exceed 500, the step fails and the workflow stops (or you can use `continue-on-error: true` to proceed with a warning). The JSON output is still written to `costs.json` regardless.
+
 ## Available commands
 
 ### Accumulated Cost

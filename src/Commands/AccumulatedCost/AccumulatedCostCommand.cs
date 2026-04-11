@@ -146,6 +146,9 @@ public class AccumulatedCostCommand : AsyncCommand<AccumulatedCostSettings>
         await _outputFormatters[settings.Output]
             .WriteAccumulatedCost(settings, accumulatedCost);
 
-        return 0;
+        // Check cost threshold after output
+        var totalCost = accumulatedCost.Costs.Sum(a => settings.UseUSD ? a.CostUsd : a.Cost);
+        var currency = settings.UseUSD ? "USD" : accumulatedCost.Costs.FirstOrDefault()?.Currency ?? "USD";
+        return CommandHelpers.CheckCostThreshold(totalCost, settings.FailIfOver, currency);
     }
 }

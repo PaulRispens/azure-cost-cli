@@ -89,6 +89,10 @@ public class CostSettings : LogCommandSettings, ICostSettings
     [Description("Allows overriding the default HTTP timeout in seconds. Defaults to 100 seconds.")]
     public int HttpTimeout { get; set; } = 100;
     
+    [CommandOption("--fail-if-over")]
+    [Description("Fail with exit code 1 if total cost exceeds this amount. Useful for CI/CD cost gates. Not set by default.")]
+    public double? FailIfOver { get; set; }
+    
     /// <summary>
     /// Automatically sets the timeframe to Custom if both From and To dates are explicitly provided.
     /// This should be called during validation before using the Timeframe property.

@@ -59,4 +59,20 @@ public static class CommandHelpers
         if (debug)
             AnsiConsole.WriteLine($"Version: {typeof(CommandHelpers).Assembly.GetName().Version}");
     }
+
+    /// <summary>
+    /// Checks whether total cost exceeds the configured threshold.
+    /// Returns exit code 1 if exceeded, 0 otherwise. Writes a warning to stderr when exceeded.
+    /// </summary>
+    public static int CheckCostThreshold(double totalCost, double? threshold, string currency)
+    {
+        if (threshold.HasValue && totalCost > threshold.Value)
+        {
+            Console.Error.WriteLine(
+                $"Cost threshold exceeded: {totalCost:N2} {currency} > {threshold.Value:N2} {currency}");
+            return 1;
+        }
+
+        return 0;
+    }
 }

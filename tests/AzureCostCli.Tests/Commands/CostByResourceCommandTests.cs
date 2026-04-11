@@ -118,6 +118,7 @@ public class CostByResourceCommandTests
         {
             var settings = new CostByResourceSettings
             {
+                Subscription = Guid.NewGuid(),
                 Timeframe = TimeframeType.MonthToDate,
                 Sort = sort
             };
@@ -134,6 +135,7 @@ public class CostByResourceCommandTests
     {
         var settings = new CostByResourceSettings
         {
+            Subscription = Guid.NewGuid(),
             Timeframe = TimeframeType.MonthToDate,
             Sort = "invalid"
         };
@@ -150,6 +152,7 @@ public class CostByResourceCommandTests
     {
         var settings = new CostByResourceSettings
         {
+            Subscription = Guid.NewGuid(),
             Timeframe = TimeframeType.MonthToDate,
             Top = -1
         };
@@ -169,6 +172,7 @@ public class CostByResourceCommandTests
     {
         var settings = new CostByResourceSettings
         {
+            Subscription = Guid.NewGuid(),
             Timeframe = TimeframeType.MonthToDate,
             Top = top
         };

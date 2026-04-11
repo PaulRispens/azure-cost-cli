@@ -31,7 +31,31 @@ public class CsvOutputFormatter : BaseOutputFormatter
 
     public override Task WriteBudgets(BudgetsSettings settings, IEnumerable<BudgetItem> budgets)
     {
-        return ExportToCsv(settings.SkipHeader, budgets);
+        // Flatten budgets to include computed spend tracking columns
+        var flatBudgets = budgets.Select(b =>
+        {
+            dynamic expando = new ExpandoObject();
+            expando.Name = b.Name;
+            expando.Amount = b.Amount;
+            expando.TimeGrain = b.TimeGrain;
+            expando.StartDate = b.StartDate;
+            expando.EndDate = b.EndDate;
+            expando.CurrentSpendAmount = b.CurrentSpendAmount;
+            expando.CurrentSpendCurrency = b.CurrentSpendCurrency;
+            expando.CurrentSpendPercentage = b.CurrentSpendAmount.HasValue && b.Amount > 0
+                ? Math.Round(b.CurrentSpendAmount.Value / b.Amount * 100, 1)
+                : (double?)null;
+            expando.ForecastAmount = b.ForecastAmount;
+            expando.ForecastCurrency = b.ForecastCurrency;
+            expando.ForecastPercentage = b.ForecastAmount.HasValue && b.Amount > 0
+                ? Math.Round(b.ForecastAmount.Value / b.Amount * 100, 1)
+                : (double?)null;
+            expando.Remaining = b.CurrentSpendAmount.HasValue ? b.Amount - b.CurrentSpendAmount.Value : b.Amount;
+            expando.Status = BudgetStatusHelper.GetStatus(b);
+            return (object)expando;
+        }).ToList();
+
+        return ExportToCsv(settings.SkipHeader, flatBudgets);
     }
 
     public override Task WriteDailyCost(DailyCostSettings settings, IEnumerable<CostDailyItem> dailyCosts)

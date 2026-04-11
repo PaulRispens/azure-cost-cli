@@ -143,6 +143,34 @@ public class TextOutputFormatter : BaseOutputFormatter
         {
             Console.WriteLine(
                 $"Budget `{budget.Name}` with an amount of {budget.Amount:N2} (time grain of {budget.TimeGrain} from {budget.StartDate} to {budget.EndDate}) ");
+
+            // Spend tracking
+            var status = BudgetStatusHelper.GetStatus(budget);
+            Console.WriteLine($"  Status: {status}");
+
+            if (budget.CurrentSpendAmount.HasValue)
+            {
+                var spendPct = budget.Amount > 0 ? budget.CurrentSpendAmount.Value / budget.Amount * 100 : 0;
+                Console.WriteLine($"  Current Spend: {budget.CurrentSpendAmount.Value:N2} {budget.CurrentSpendCurrency} ({spendPct:N1}% of budget)");
+            }
+            else
+            {
+                Console.WriteLine("  Current Spend: N/A");
+            }
+
+            if (budget.ForecastAmount.HasValue)
+            {
+                var forecastPct = budget.Amount > 0 ? budget.ForecastAmount.Value / budget.Amount * 100 : 0;
+                Console.WriteLine($"  Forecast: {budget.ForecastAmount.Value:N2} {budget.ForecastCurrency} ({forecastPct:N1}% of budget)");
+            }
+            else
+            {
+                Console.WriteLine("  Forecast: N/A");
+            }
+
+            var remaining = budget.CurrentSpendAmount.HasValue ? budget.Amount - budget.CurrentSpendAmount.Value : budget.Amount;
+            Console.WriteLine($"  Remaining: {remaining:N2}");
+
             foreach (var notification in budget.Notifications)
             {
                 Console.WriteLine(

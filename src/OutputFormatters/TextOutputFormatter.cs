@@ -238,10 +238,28 @@ public class TextOutputFormatter : BaseOutputFormatter
     public override Task WriteAccumulatedDiffCost(DiffSettings settings, AccumulatedCostDetails accumulatedCostSource,
         AccumulatedCostDetails accumulatedCostTarget)
     {
-        var currency = settings.UseUSD ? "USD" : accumulatedCostSource.Costs.FirstOrDefault()?.Currency ?? "USD";
-        
-        var sourceRange = $"{accumulatedCostSource.Costs.Min(a => a.Date)} to {accumulatedCostSource.Costs.Max(a => a.Date)}";
-        var targetRange = $"{accumulatedCostTarget.Costs.Min(a => a.Date)} to {accumulatedCostTarget.Costs.Max(a => a.Date)}";
+        var sourceHasCosts = accumulatedCostSource.Costs.Any();
+        var targetHasCosts = accumulatedCostTarget.Costs.Any();
+
+        if (sourceHasCosts == false && targetHasCosts == false)
+        {
+            Console.WriteLine("Azure Cost Diff");
+            Console.WriteLine("No data found.");
+            return Task.CompletedTask;
+        }
+
+        var currency = settings.UseUSD
+            ? "USD"
+            : accumulatedCostSource.Costs.FirstOrDefault()?.Currency
+              ?? accumulatedCostTarget.Costs.FirstOrDefault()?.Currency
+              ?? "USD";
+
+        var sourceRange = sourceHasCosts
+            ? $"{accumulatedCostSource.Costs.Min(a => a.Date)} to {accumulatedCostSource.Costs.Max(a => a.Date)}"
+            : "N/A";
+        var targetRange = targetHasCosts
+            ? $"{accumulatedCostTarget.Costs.Min(a => a.Date)} to {accumulatedCostTarget.Costs.Max(a => a.Date)}"
+            : "N/A";
         
         Console.WriteLine("Azure Cost Diff");
         Console.WriteLine($"Source: ({sourceRange})");

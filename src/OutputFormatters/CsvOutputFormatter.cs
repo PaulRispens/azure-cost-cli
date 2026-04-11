@@ -164,20 +164,37 @@ public class CsvOutputFormatter : BaseOutputFormatter
     private static void AddDiffRows(List<DiffCsvRow> rows, string category,
         List<CostNamedItem> sourceItems, List<CostNamedItem> targetItems, bool useUsd)
     {
-        var allNames = sourceItems.Select(a => a.ItemName)
-            .Union(targetItems.Select(a => a.ItemName))
-            .Distinct()
+        var sourceLookup = sourceItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(
+                group => group.Key,
+                group => new
+                {
+                    Cost = group.Sum(a => useUsd ? a.CostUsd : a.Cost),
+                    Currency = group.Select(a => a.Currency).FirstOrDefault()
+                });
+        var targetLookup = targetItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(
+                group => group.Key,
+                group => new
+                {
+                    Cost = group.Sum(a => useUsd ? a.CostUsd : a.Cost),
+                    Currency = group.Select(a => a.Currency).FirstOrDefault()
+                });
+        var allNames = sourceLookup.Keys
+            .Union(targetLookup.Keys)
             .OrderBy(a => a);
         
         foreach (var name in allNames)
         {
-            var sourceCost = sourceItems.Where(a => a.ItemName == name)
-                .Sum(a => useUsd ? a.CostUsd : a.Cost);
-            var targetCost = targetItems.Where(a => a.ItemName == name)
-                .Sum(a => useUsd ? a.CostUsd : a.Cost);
+            var hasSource = sourceLookup.TryGetValue(name, out var sourceEntry);
+            var hasTarget = targetLookup.TryGetValue(name, out var targetEntry);
+            var sourceCost = hasSource ? sourceEntry!.Cost : 0;
+            var targetCost = hasTarget ? targetEntry!.Cost : 0;
             var currency = useUsd ? "USD" :
-                sourceItems.FirstOrDefault(a => a.ItemName == name)?.Currency ??
-                targetItems.FirstOrDefault(a => a.ItemName == name)?.Currency ?? "USD";
+                sourceEntry?.Currency ??
+                targetEntry?.Currency ?? "USD";
             
             rows.Add(new DiffCsvRow
             {
@@ -262,10 +279,10 @@ public class CustomDoubleConverter : DoubleConverter
 
 public class DiffCsvRow
 {
-    public string Category { get; set; }
-    public string Name { get; set; }
+    public string Category { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
     public double SourceCost { get; set; }
     public double TargetCost { get; set; }
     public double Diff { get; set; }
-    public string Currency { get; set; }
+    public string Currency { get; set; } = string.Empty;
 }

@@ -24,14 +24,41 @@ public class CsvOutputFormatter : BaseOutputFormatter
         return ExportToCsv(settings.SkipHeader, accumulatedCostDetails.Costs);
     }
 
-    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources)
+    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources,
+        int totalCount = 0, double totalCost = 0, string currency = "USD")
     {
         return ExportToCsv(settings.SkipHeader, resources);
     }
 
     public override Task WriteBudgets(BudgetsSettings settings, IEnumerable<BudgetItem> budgets)
     {
-        return ExportToCsv(settings.SkipHeader, budgets);
+        // Flatten budgets to include computed spend tracking columns
+        var flatBudgets = budgets.Select(b =>
+        {
+            dynamic expando = new ExpandoObject();
+            expando.Name = b.Name;
+            expando.Id = b.Id;
+            expando.Amount = b.Amount;
+            expando.TimeGrain = b.TimeGrain;
+            expando.StartDate = b.StartDate;
+            expando.EndDate = b.EndDate;
+            expando.CurrentSpendAmount = b.CurrentSpendAmount;
+            expando.CurrentSpendCurrency = b.CurrentSpendCurrency;
+            expando.CurrentSpendPercentage = b.CurrentSpendAmount.HasValue && b.Amount > 0
+                ? Math.Round(b.CurrentSpendAmount.Value / b.Amount * 100, 1)
+                : (double?)null;
+            expando.ForecastAmount = b.ForecastAmount;
+            expando.ForecastCurrency = b.ForecastCurrency;
+            expando.ForecastPercentage = b.ForecastAmount.HasValue && b.Amount > 0
+                ? Math.Round(b.ForecastAmount.Value / b.Amount * 100, 1)
+                : (double?)null;
+            expando.Remaining = b.CurrentSpendAmount.HasValue ? b.Amount - b.CurrentSpendAmount.Value : b.Amount;
+            expando.Status = BudgetStatusHelper.GetStatus(b);
+            expando.NotificationCount = b.Notifications?.Count ?? 0;
+            return (object)expando;
+        }).ToList();
+
+        return ExportToCsv(settings.SkipHeader, flatBudgets);
     }
 
     public override Task WriteDailyCost(DailyCostSettings settings, IEnumerable<CostDailyItem> dailyCosts)
@@ -149,82 +176,62 @@ public class CsvOutputFormatter : BaseOutputFormatter
     public override Task WriteAccumulatedDiffCost(DiffSettings settings, AccumulatedCostDetails accumulatedCostSource,
         AccumulatedCostDetails accumulatedCostTarget)
     {
-        var rows = new List<DiffCsvRow>();
-        
-        AddDiffRows(rows, "ServiceName", accumulatedCostSource.ByServiceNameCosts.ToList(),
+        var diffRows = new List<object>();
+
+        AddDiffRows(diffRows, "ServiceName", accumulatedCostSource.ByServiceNameCosts.ToList(),
             accumulatedCostTarget.ByServiceNameCosts.ToList(), settings.UseUSD);
-        AddDiffRows(rows, "Location", accumulatedCostSource.ByLocationCosts.ToList(),
+        AddDiffRows(diffRows, "Location", accumulatedCostSource.ByLocationCosts.ToList(),
             accumulatedCostTarget.ByLocationCosts.ToList(), settings.UseUSD);
-        AddDiffRows(rows, "ResourceGroup", accumulatedCostSource.ByResourceGroupCosts.ToList(),
+        AddDiffRows(diffRows, "ResourceGroup", accumulatedCostSource.ByResourceGroupCosts.ToList(),
             accumulatedCostTarget.ByResourceGroupCosts.ToList(), settings.UseUSD);
-        
-        return ExportDiffToCsv(settings.SkipHeader, rows);
+
+        return ExportToCsv(settings.SkipHeader, diffRows);
     }
-    
-    private static void AddDiffRows(List<DiffCsvRow> rows, string category,
-        List<CostNamedItem> sourceItems, List<CostNamedItem> targetItems, bool useUsd)
+
+    private static void AddDiffRows(List<object> rows, string category,
+        List<CostNamedItem> sourceItems, List<CostNamedItem> targetItems, bool useUSD)
     {
-        var sourceLookup = sourceItems
+        var sourceCosts = sourceItems
             .GroupBy(a => a.ItemName)
             .ToDictionary(
                 group => group.Key,
-                group => new
-                {
-                    Cost = group.Sum(a => useUsd ? a.CostUsd : a.Cost),
-                    Currency = group.Select(a => a.Currency).FirstOrDefault()
-                });
-        var targetLookup = targetItems
+                group => group.Sum(a => useUSD ? a.CostUsd : a.Cost));
+
+        var targetCosts = targetItems
             .GroupBy(a => a.ItemName)
             .ToDictionary(
                 group => group.Key,
-                group => new
-                {
-                    Cost = group.Sum(a => useUsd ? a.CostUsd : a.Cost),
-                    Currency = group.Select(a => a.Currency).FirstOrDefault()
-                });
-        var allNames = sourceLookup.Keys
-            .Union(targetLookup.Keys)
-            .OrderBy(a => a);
-        
+                group => group.Sum(a => useUSD ? a.CostUsd : a.Cost));
+
+        var sourceCurrencies = sourceItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(group => group.Key, group => group.First().Currency);
+
+        var targetCurrencies = targetItems
+            .GroupBy(a => a.ItemName)
+            .ToDictionary(group => group.Key, group => group.First().Currency);
+
+        var allNames = sourceCosts.Keys
+            .Union(targetCosts.Keys)
+            .ToList();
+
         foreach (var name in allNames)
         {
-            var hasSource = sourceLookup.TryGetValue(name, out var sourceEntry);
-            var hasTarget = targetLookup.TryGetValue(name, out var targetEntry);
-            var sourceCost = hasSource ? sourceEntry!.Cost : 0;
-            var targetCost = hasTarget ? targetEntry!.Cost : 0;
-            var currency = useUsd ? "USD" :
-                sourceEntry?.Currency ??
-                targetEntry?.Currency ?? "USD";
-            
-            rows.Add(new DiffCsvRow
-            {
-                Category = category,
-                Name = name,
-                SourceCost = sourceCost,
-                TargetCost = targetCost,
-                Diff = targetCost - sourceCost,
-                Currency = currency
-            });
+            sourceCosts.TryGetValue(name, out var sourceCost);
+            targetCosts.TryGetValue(name, out var targetCost);
+
+            var diff = targetCost - sourceCost;
+            var currency =
+                (sourceCurrencies.TryGetValue(name, out var sourceCurrency) ? sourceCurrency : null)
+                ?? (targetCurrencies.TryGetValue(name, out var targetCurrency) ? targetCurrency : null)
+                ?? "USD";
+
+            rows.Add(new CostDiffRecord(category, name, sourceCost, targetCost, diff,
+                useUSD ? "USD" : currency));
         }
     }
-    
-    private static Task ExportDiffToCsv(bool skipHeader, IEnumerable<DiffCsvRow> rows)
-    {
-        var config = new CsvConfiguration(CultureInfo.CurrentCulture)
-        {
-            HasHeaderRecord = skipHeader == false
-        };
 
-        using (var writer = new StringWriter())
-        using (var csv = new CsvWriter(writer, config))
-        {
-            csv.Context.TypeConverterCache.AddConverter<double>(new CustomDoubleConverter());
-            csv.WriteRecords(rows);
-            Console.Write(writer.ToString());
-        }
-
-        return Task.CompletedTask;
-    }
+    private record CostDiffRecord(string Category, string Name, double SourceCost, double TargetCost, double Change, string Currency);
 
     public override Task WriteDevTestComparison(WhatIfSettings settings, IEnumerable<DevTestComparisonItem> items)
     {
@@ -275,14 +282,4 @@ public class CustomDoubleConverter : DoubleConverter
             _ => throw new InvalidOperationException("The value is not a double.")
         };
     }
-}
-
-public class DiffCsvRow
-{
-    public string Category { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public double SourceCost { get; set; }
-    public double TargetCost { get; set; }
-    public double Diff { get; set; }
-    public string Currency { get; set; } = string.Empty;
 }

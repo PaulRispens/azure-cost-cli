@@ -60,6 +60,9 @@ public class DailyCostCommand : AsyncCommand<DailyCostSettings>
         await _outputFormatters[settings.Output]
             .WriteDailyCost(settings, dailyCost);
 
-        return 0; // Omitted
+        // Check cost threshold after output
+        var totalCost = dailyCost.Sum(d => settings.UseUSD ? d.CostUsd : d.Cost);
+        var currency = settings.UseUSD ? "USD" : dailyCost.FirstOrDefault()?.Currency ?? "USD";
+        return CommandHelpers.CheckCostThreshold(totalCost, settings.FailIfOver, currency);
     }
 }

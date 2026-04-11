@@ -154,6 +154,21 @@ jobs:
 
 The last step outputs the markdown to the Job Summary. This can be used to show the cost of the subscription in the workflow summary. Use it on a schedule to get for example a daily overview. Alternatively you can use the `-o json` parameter to get the results in JSON format and use it for further processing.
 
+## CI/CD Cost Gates
+
+Use the `--fail-if-over <amount>` flag to fail a pipeline step when costs exceed a threshold. When the total cost exceeds the specified amount, the command writes a warning to stderr and exits with code 1. Output is still written normally before the check, so piped output (e.g. to a file) is not affected.
+
+Supported commands: `accumulatedCost`, `costByResource`, `dailyCosts`.
+
+### Example: GitHub Actions cost gate
+
+```yaml
+- name: Check Azure costs
+  run: azure-cost accumulatedCost -s ${{ secrets.AZURE_SUBSCRIPTION_ID }} -o json --fail-if-over 500 > costs.json
+```
+
+If costs exceed 500, the step fails and the workflow stops (or you can use `continue-on-error: true` to proceed with a warning). The JSON output is still written to `costs.json` regardless.
+
 ## Available commands
 
 ### Accumulated Cost
@@ -186,12 +201,40 @@ A resource can be in multiple resource locations, like Intercontinental and West
 
 You can parse out the resource name, group name and subscription id from the ResourceId field. The format is `/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}`.
 
+#### Sorting and limiting results
+
+Use `--sort` to control the order of resources. The default is `cost` (descending, most expensive first). Available options: `cost`, `cost-asc`, `name`, `resource-group`, `resource-type`, `location`.
+
+```bash
+azure-cost costByResource -s 574385a9-08e9-49fe-91a2-27660d92b8f5 --sort name
+```
+
+Use `--top N` to show only the top N resources. Use `0` to show all (the default).
+
+```bash
+azure-cost costByResource -s 574385a9-08e9-49fe-91a2-27660d92b8f5 --top 10
+```
+
+Combine both to get, for example, the 5 most expensive resources:
+
+```bash
+azure-cost costByResource -s 574385a9-08e9-49fe-91a2-27660d92b8f5 --top 5 --sort cost
+```
+
+> Note: `--top` limits the total number of resources passed to formatters. This is different from `--others-cutoff`, which collapses smaller items into an "Others" row in console output.
+
 ### Cost By Tag
 
 This will retrieve the cost of the subscription by the provided tag key(s). So if you tag your resources with, e.g. a `cost-center` or a `creator`, you can retrieve the cost of the subscription by those tags. You can specify multiple tags by using the `--tag` parameter multiple times. 
 
 ```bash
 azure-cost costByTag  --tag cost-center --tag creator
+```
+
+By default, resources without the specified tag(s) are included in an `(untagged)` group, making it easy to see what percentage of spend is properly tagged. To exclude untagged resources (the old behavior), use `--include-untagged false`:
+
+```bash
+azure-cost costByTag --tag cost-center --include-untagged false
 ```
 
 The csv, json(c) and console output will render the results, either hierarchically or flattened in the case of the csv export.
@@ -268,11 +311,23 @@ azure-cost detectAnomalies
 
 ### Budgets
 
-This will retrieve the available budgets for the subscription. It will show the current status of the budget and the amount of the budget. As well as listing the configured notifications. 
+This will retrieve the available budgets for the subscription. It will show the current status of the budget and the amount of the budget. It now also includes **spend tracking** information:
+
+- **Current Spend**: How much has been spent in the current budget period, with percentage of budget used
+- **Forecast**: Projected spend for the budget period, with percentage of budget
+- **Status**: Budget health indicator:
+  - 🟢 **OK** — spend is below 80% of budget
+  - 🟡 **AT-RISK** — spend is between 80-99% of budget
+  - 🔴 **EXCEEDED** — spend has reached or exceeded the budget amount
+- **Remaining**: How much budget remains
+
+As well as listing the configured notifications. 
 
 ```bash
 azure-cost budgets -s 574385a9-08e9-49fe-91a2-27660d92b8f5 
 ```
+
+Output is available in all formats (`-o text`, `-o json`, `-o markdown`, `-o csv`, `-o console`).
 
 ### Regions
 

@@ -15,7 +15,8 @@ public abstract class BaseOutputFormatter
 {
     public abstract Task WriteAccumulatedCost(AccumulatedCostSettings settings,AccumulatedCostDetails accumulatedCostDetails);
 
-    public abstract Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources);
+    public abstract Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources,
+        int totalCount = 0, double totalCost = 0, string currency = "USD");
     
     public abstract Task WriteBudgets(BudgetsSettings settings, IEnumerable<BudgetItem> budgets);
 

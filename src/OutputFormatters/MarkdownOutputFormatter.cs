@@ -212,7 +212,8 @@ public class MarkdownOutputFormatter : BaseOutputFormatter
         return Task.CompletedTask;
     }
 
-    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources)
+    public override Task WriteCostByResource(CostByResourceSettings settings, IEnumerable<CostResourceItem> resources,
+        int totalCount = 0, double totalCost = 0, string currency = "USD")
     {
 
         if (settings.ExcludeMeterDetails)
@@ -251,6 +252,14 @@ public class MarkdownOutputFormatter : BaseOutputFormatter
             }
         }
 
+        if (settings.Top > 0 && totalCount > 0 && settings.Top < totalCount)
+        {
+            var displayedCount = Math.Min(settings.Top, totalCount);
+            var costDisplay = settings.UseUSD ? $"{totalCost:N2} USD" : $"{totalCost:N2} {currency}";
+            Console.WriteLine();
+            Console.WriteLine($"> Showing top {displayedCount} of {totalCount} resources (total cost: {costDisplay})");
+        }
+
         return Task.CompletedTask;
     }
 
@@ -263,6 +272,36 @@ public class MarkdownOutputFormatter : BaseOutputFormatter
 
             Console.WriteLine();
         }
+
+        // Summary table
+        Console.WriteLine("| Budget | Amount | Status | Current Spend | Forecast | Remaining |");
+        Console.WriteLine("|--------|--------|--------|---------------|----------|-----------|");
+
+        foreach (var budget in budgets.OrderByDescending(a=>a.Name))
+        {
+            var status = BudgetStatusHelper.GetStatus(budget);
+            var statusEmoji = status switch
+            {
+                "EXCEEDED" => "🔴 EXCEEDED",
+                "AT-RISK" => "🟡 AT-RISK",
+                _ => "🟢 OK"
+            };
+
+            var spendText = budget.CurrentSpendAmount.HasValue
+                ? $"{budget.CurrentSpendAmount.Value:N2} {budget.CurrentSpendCurrency} ({(budget.Amount > 0 ? budget.CurrentSpendAmount.Value / budget.Amount * 100 : 0):N1}%)"
+                : "N/A";
+
+            var forecastText = budget.ForecastAmount.HasValue
+                ? $"{budget.ForecastAmount.Value:N2} {budget.ForecastCurrency} ({(budget.Amount > 0 ? budget.ForecastAmount.Value / budget.Amount * 100 : 0):N1}%)"
+                : "N/A";
+
+            var remaining = budget.CurrentSpendAmount.HasValue ? budget.Amount - budget.CurrentSpendAmount.Value : budget.Amount;
+
+            var escapedName = budget.Name.Replace("|", "\\|").Replace("\n", " ").Replace("\r", "");
+            Console.WriteLine($"| {escapedName} | {budget.Amount:N2} | {statusEmoji} | {spendText} | {forecastText} | {remaining:N2} |");
+        }
+
+        Console.WriteLine();
 
         foreach (var budget in budgets.OrderByDescending(a=>a.Name))
         {

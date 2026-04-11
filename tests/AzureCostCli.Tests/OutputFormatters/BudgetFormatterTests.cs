@@ -3,9 +3,6 @@ using AzureCostCli.Commands.Budgets;
 using AzureCostCli.CostApi;
 using AzureCostCli.OutputFormatters;
 using Shouldly;
-using System.Globalization;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace AzureCostCli.Tests.OutputFormatters;
 

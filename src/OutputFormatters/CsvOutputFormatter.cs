@@ -36,6 +36,7 @@ public class CsvOutputFormatter : BaseOutputFormatter
         {
             dynamic expando = new ExpandoObject();
             expando.Name = b.Name;
+            expando.Id = b.Id;
             expando.Amount = b.Amount;
             expando.TimeGrain = b.TimeGrain;
             expando.StartDate = b.StartDate;
@@ -52,6 +53,7 @@ public class CsvOutputFormatter : BaseOutputFormatter
                 : (double?)null;
             expando.Remaining = b.CurrentSpendAmount.HasValue ? b.Amount - b.CurrentSpendAmount.Value : b.Amount;
             expando.Status = BudgetStatusHelper.GetStatus(b);
+            expando.NotificationCount = b.Notifications?.Count ?? 0;
             return (object)expando;
         }).ToList();
 

@@ -342,7 +342,7 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
             if (budget.CurrentSpendAmount.HasValue)
             {
                 var spendPct = budget.Amount > 0 ? budget.CurrentSpendAmount.Value / budget.Amount * 100 : 0;
-                var barLength = (int)Math.Min(Math.Round(spendPct / 5), 20);
+                var barLength = (int)Math.Clamp(Math.Round(spendPct / 5), 0, 20);
                 var bar = new string('█', barLength) + new string('░', 20 - barLength);
                 var barColor = spendPct >= 100 ? "red" : spendPct >= 80 ? "yellow" : "green";
                 spendText = $"[{barColor}]{bar}[/] {budget.CurrentSpendAmount.Value:N2} {budget.CurrentSpendCurrency} ({spendPct:N1}%)";
@@ -371,7 +371,7 @@ public class ConsoleOutputFormatter : BaseOutputFormatter
             var remainingText = $"[{remainingColor}]{remaining:N2}[/]";
 
             table.AddRow(
-                new Markup($"[bold]{budget.Name}[/]"),
+                new Markup($"[bold]{budget.Name.EscapeMarkup()}[/]"),
                 new Markup(budget.Amount.ToString("N2")),
                 statusMarkup,
                 new Markup(spendText),

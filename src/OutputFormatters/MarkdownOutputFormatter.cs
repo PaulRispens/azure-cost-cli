@@ -288,7 +288,8 @@ public class MarkdownOutputFormatter : BaseOutputFormatter
 
             var remaining = budget.CurrentSpendAmount.HasValue ? budget.Amount - budget.CurrentSpendAmount.Value : budget.Amount;
 
-            Console.WriteLine($"| {budget.Name} | {budget.Amount:N2} | {statusEmoji} | {spendText} | {forecastText} | {remaining:N2} |");
+            var escapedName = budget.Name.Replace("|", "\\|").Replace("\n", " ").Replace("\r", "");
+            Console.WriteLine($"| {escapedName} | {budget.Amount:N2} | {statusEmoji} | {spendText} | {forecastText} | {remaining:N2} |");
         }
 
         Console.WriteLine();

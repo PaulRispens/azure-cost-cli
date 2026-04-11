@@ -149,8 +149,39 @@ public class CsvOutputFormatter : BaseOutputFormatter
     public override Task WriteAccumulatedDiffCost(DiffSettings settings, AccumulatedCostDetails accumulatedCostSource,
         AccumulatedCostDetails accumulatedCostTarget)
     {
-        return Task.CompletedTask;
+        var diffRows = new List<object>();
+
+        AddDiffRows(diffRows, "ServiceName", accumulatedCostSource.ByServiceNameCosts.ToList(),
+            accumulatedCostTarget.ByServiceNameCosts.ToList(), settings.UseUSD);
+        AddDiffRows(diffRows, "Location", accumulatedCostSource.ByLocationCosts.ToList(),
+            accumulatedCostTarget.ByLocationCosts.ToList(), settings.UseUSD);
+        AddDiffRows(diffRows, "ResourceGroup", accumulatedCostSource.ByResourceGroupCosts.ToList(),
+            accumulatedCostTarget.ByResourceGroupCosts.ToList(), settings.UseUSD);
+
+        return ExportToCsv(settings.SkipHeader, diffRows);
     }
+
+    private static void AddDiffRows(List<object> rows, string category,
+        List<CostNamedItem> sourceItems, List<CostNamedItem> targetItems, bool useUSD)
+    {
+        var allNames = sourceItems.Select(a => a.ItemName)
+            .Union(targetItems.Select(a => a.ItemName))
+            .Distinct()
+            .ToList();
+
+        foreach (var name in allNames)
+        {
+            var sourceCost = sourceItems.Where(a => a.ItemName == name).Sum(a => useUSD ? a.CostUsd : a.Cost);
+            var targetCost = targetItems.Where(a => a.ItemName == name).Sum(a => useUSD ? a.CostUsd : a.Cost);
+            var diff = targetCost - sourceCost;
+            var currency = sourceItems.Concat(targetItems).FirstOrDefault(a => a.ItemName == name)?.Currency ?? "USD";
+
+            rows.Add(new CostDiffRecord(category, name, sourceCost, targetCost, diff,
+                useUSD ? "USD" : currency));
+        }
+    }
+
+    private record CostDiffRecord(string Category, string Name, double SourceCost, double TargetCost, double Change, string Currency);
 
     public override Task WriteDevTestComparison(WhatIfSettings settings, IEnumerable<DevTestComparisonItem> items)
     {

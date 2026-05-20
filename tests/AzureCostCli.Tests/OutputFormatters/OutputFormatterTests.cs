@@ -1,6 +1,7 @@
 using AzureCostCli.Commands.AccumulatedCost;
 using AzureCostCli.Commands.Budgets;
 using AzureCostCli.Commands.DailyCost;
+using AzureCostCli.Commands.DetectAnomaly;
 using AzureCostCli.CostApi;
 using AzureCostCli.OutputFormatters;
 using Shouldly;
@@ -624,5 +625,27 @@ public class MarkdownOutputFormatterTests
         {
             Console.SetOut(originalOut);
         }
+    }
+}
+
+[Collection("ConsoleOutputTests")]
+public class ConsoleOutputFormatterTests
+{
+    private readonly ConsoleOutputFormatter _formatter;
+
+    public ConsoleOutputFormatterTests()
+    {
+        _formatter = new ConsoleOutputFormatter();
+    }
+
+    [Fact]
+    public async Task WriteAnomalyDetectionResults_WithNoAnomalies_ShouldNotThrow()
+    {
+        // Arrange
+        var settings = new DetectAnomalySettings();
+        var anomalies = new List<AnomalyDetectionResult>();
+
+        // Act & Assert - Should not throw
+        await _formatter.WriteAnomalyDetectionResults(settings, anomalies);
     }
 }
